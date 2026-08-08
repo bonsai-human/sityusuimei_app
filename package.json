@@ -1,0 +1,31 @@
+{
+  "name": "sityusuimei-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "lunar-typescript": "^1.8.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^6.0.5",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.7.2",
+    "vite": "^8.2.1",
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.10"
+  }
+}

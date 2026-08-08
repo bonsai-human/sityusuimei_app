@@ -1,0 +1,214 @@
+import type { ReactNode } from 'react';
+
+import type { Element } from '../core/constants';
+
+/** 五行のカラートークンを解決するクラス名。index.css の element-* に対応する。 */
+export function elementClass(element: Element): string {
+  return `element-${element}`;
+}
+
+export function Section({
+  title,
+  subtitle,
+  actions,
+  children,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="card p-4 sm:p-5">
+      <header className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        {actions}
+        {subtitle && (
+          <p className="w-full text-xs" style={{ color: 'var(--ink-muted)' }}>
+            {subtitle}
+          </p>
+        )}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+export function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+        {label}
+      </span>
+      {children}
+      {hint && (
+        <span className="mt-1 block text-xs" style={{ color: 'var(--ink-faint)' }}>
+          {hint}
+        </span>
+      )}
+    </label>
+  );
+}
+
+/**
+ * ボタン群など、単一の入力欄ではないものに見出しを付ける。
+ * `<label>` で囲んでしまうと、中の最初のボタンの読み上げ名が見出しに乗っ取られるので、
+ * 見出しは div + role="group" の aria-label として渡す。
+ */
+export function LabeledGroup({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <span className="mb-1 block text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+        {label}
+      </span>
+      {children}
+      {hint && (
+        <span className="mt-1 block text-xs" style={{ color: 'var(--ink-faint)' }}>
+          {hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** 排他選択のセグメントボタン。ラジオボタンより指で押しやすい。 */
+export function Segmented<T extends string | number>({
+  value,
+  options,
+  onChange,
+  size = 'md',
+  ariaLabel,
+}: {
+  value: T;
+  options: { value: T; label: string; title?: string }[];
+  onChange: (value: T) => void;
+  size?: 'sm' | 'md';
+  ariaLabel: string;
+}) {
+  return (
+    <div
+      className="inline-flex w-full overflow-hidden rounded-lg"
+      style={{ border: '1px solid var(--line-strong)' }}
+      role="group"
+      aria-label={ariaLabel}
+    >
+      {options.map((o, i) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={String(o.value)}
+            type="button"
+            title={o.title}
+            aria-pressed={active}
+            onClick={() => onChange(o.value)}
+            className={`flex-1 whitespace-nowrap transition-colors ${
+              size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'
+            }`}
+            style={{
+              background: active ? 'var(--accent)' : 'var(--surface-raised)',
+              color: active ? 'var(--surface-raised)' : 'var(--ink-muted)',
+              fontWeight: active ? 600 : 400,
+              borderLeft: i === 0 ? undefined : '1px solid var(--line)',
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: ReactNode;
+  hint?: ReactNode;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5 py-1">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 shrink-0 accent-current"
+        style={{ color: 'var(--accent)' }}
+      />
+      <span className="text-sm leading-snug">
+        {label}
+        {hint && (
+          <span className="mt-0.5 block text-xs" style={{ color: 'var(--ink-faint)' }}>
+            {hint}
+          </span>
+        )}
+      </span>
+    </label>
+  );
+}
+
+export function Button({
+  children,
+  onClick,
+  variant = 'secondary',
+  type = 'button',
+  disabled,
+  full,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'ghost';
+  type?: 'button' | 'submit';
+  disabled?: boolean;
+  full?: boolean;
+}) {
+  const style: Record<string, string> =
+    variant === 'primary'
+      ? { background: 'var(--accent)', color: 'var(--surface-raised)', border: '1px solid transparent' }
+      : variant === 'ghost'
+        ? { background: 'transparent', color: 'var(--ink-muted)', border: '1px solid transparent' }
+        : { background: 'var(--surface-raised)', color: 'var(--ink)', border: '1px solid var(--line-strong)' };
+
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded-lg px-4 py-2 text-sm font-medium transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-45 ${
+        full ? 'w-full' : ''
+      }`}
+      style={style}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** 用語の脇に置く注釈。ホバー/長押しで読める。 */
+export function Note({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-faint)' }}>
+      {children}
+    </p>
+  );
+}

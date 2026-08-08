@@ -1,0 +1,202 @@
+@import 'tailwindcss';
+
+/*
+ * 五行のカラートークン。命式表示のあらゆる場所（天干・地支・蔵干・五行バランス・
+ * 大運タイムライン）でこの 5 色だけを使い、色そのものが凡例になるようにする。
+ * -fg は文字色、-bg は塗り、-line は境界線。ライト/ダークで別値を持つ。
+ */
+@theme {
+  --font-sans: 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', system-ui, sans-serif;
+  --font-kanji: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+}
+
+:root {
+  color-scheme: light dark;
+
+  --ink: oklch(0.22 0.01 260);
+  --ink-muted: oklch(0.52 0.012 260);
+  --ink-faint: oklch(0.66 0.01 260);
+  --surface: oklch(0.99 0.002 260);
+  --surface-raised: oklch(1 0 0);
+  --surface-sunken: oklch(0.965 0.004 260);
+  --line: oklch(0.9 0.005 260);
+  --line-strong: oklch(0.78 0.008 260);
+  --accent: oklch(0.52 0.13 255);
+  --accent-soft: oklch(0.95 0.03 255);
+
+  --wood-fg: oklch(0.42 0.12 150);
+  --wood-bg: oklch(0.95 0.045 150);
+  --wood-line: oklch(0.75 0.09 150);
+
+  --fire-fg: oklch(0.48 0.16 25);
+  --fire-bg: oklch(0.95 0.04 25);
+  --fire-line: oklch(0.75 0.11 25);
+
+  --earth-fg: oklch(0.45 0.09 75);
+  --earth-bg: oklch(0.95 0.045 85);
+  --earth-line: oklch(0.76 0.08 80);
+
+  --metal-fg: oklch(0.45 0.045 95);
+  --metal-bg: oklch(0.955 0.018 95);
+  --metal-line: oklch(0.76 0.035 95);
+
+  --water-fg: oklch(0.44 0.11 250);
+  --water-bg: oklch(0.95 0.035 250);
+  --water-line: oklch(0.74 0.08 250);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ink: oklch(0.92 0.006 260);
+    --ink-muted: oklch(0.7 0.012 260);
+    --ink-faint: oklch(0.55 0.012 260);
+    --surface: oklch(0.19 0.012 260);
+    --surface-raised: oklch(0.235 0.014 260);
+    --surface-sunken: oklch(0.155 0.012 260);
+    --line: oklch(0.33 0.014 260);
+    --line-strong: oklch(0.46 0.018 260);
+    --accent: oklch(0.75 0.12 255);
+    --accent-soft: oklch(0.3 0.05 255);
+
+    --wood-fg: oklch(0.82 0.13 150);
+    --wood-bg: oklch(0.29 0.05 150);
+    --wood-line: oklch(0.5 0.09 150);
+
+    --fire-fg: oklch(0.79 0.13 25);
+    --fire-bg: oklch(0.3 0.06 25);
+    --fire-line: oklch(0.52 0.11 25);
+
+    --earth-fg: oklch(0.82 0.1 80);
+    --earth-bg: oklch(0.3 0.045 80);
+    --earth-line: oklch(0.52 0.075 80);
+
+    --metal-fg: oklch(0.85 0.04 95);
+    --metal-bg: oklch(0.3 0.018 95);
+    --metal-line: oklch(0.53 0.035 95);
+
+    --water-fg: oklch(0.8 0.1 250);
+    --water-bg: oklch(0.29 0.05 250);
+    --water-line: oklch(0.52 0.085 250);
+  }
+}
+
+[data-theme='dark'] {
+  --ink: oklch(0.92 0.006 260);
+  --ink-muted: oklch(0.7 0.012 260);
+  --ink-faint: oklch(0.55 0.012 260);
+  --surface: oklch(0.19 0.012 260);
+  --surface-raised: oklch(0.235 0.014 260);
+  --surface-sunken: oklch(0.155 0.012 260);
+  --line: oklch(0.33 0.014 260);
+  --line-strong: oklch(0.46 0.018 260);
+  --accent: oklch(0.75 0.12 255);
+  --accent-soft: oklch(0.3 0.05 255);
+
+  --wood-fg: oklch(0.82 0.13 150);
+  --wood-bg: oklch(0.29 0.05 150);
+  --wood-line: oklch(0.5 0.09 150);
+
+  --fire-fg: oklch(0.79 0.13 25);
+  --fire-bg: oklch(0.3 0.06 25);
+  --fire-line: oklch(0.52 0.11 25);
+
+  --earth-fg: oklch(0.82 0.1 80);
+  --earth-bg: oklch(0.3 0.045 80);
+  --earth-line: oklch(0.52 0.075 80);
+
+  --metal-fg: oklch(0.85 0.04 95);
+  --metal-bg: oklch(0.3 0.018 95);
+  --metal-line: oklch(0.53 0.035 95);
+
+  --water-fg: oklch(0.8 0.1 250);
+  --water-bg: oklch(0.29 0.05 250);
+  --water-line: oklch(0.52 0.085 250);
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 五行ごとの塗り。element-{wood|fire|earth|metal|water} を要素に付けると
+   --el-* が解決され、下の .el-chip / .el-bar がそれを参照する。 */
+.element-wood {
+  --el-fg: var(--wood-fg);
+  --el-bg: var(--wood-bg);
+  --el-line: var(--wood-line);
+}
+.element-fire {
+  --el-fg: var(--fire-fg);
+  --el-bg: var(--fire-bg);
+  --el-line: var(--fire-line);
+}
+.element-earth {
+  --el-fg: var(--earth-fg);
+  --el-bg: var(--earth-bg);
+  --el-line: var(--earth-line);
+}
+.element-metal {
+  --el-fg: var(--metal-fg);
+  --el-bg: var(--metal-bg);
+  --el-line: var(--metal-line);
+}
+.element-water {
+  --el-fg: var(--water-fg);
+  --el-bg: var(--water-bg);
+  --el-line: var(--water-line);
+}
+
+.el-chip {
+  background: var(--el-bg);
+  color: var(--el-fg);
+  border: 1px solid var(--el-line);
+}
+
+.el-text {
+  color: var(--el-fg);
+}
+
+.el-fill {
+  background: var(--el-fg);
+}
+
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
+}
+
+.hairline {
+  border-color: var(--line);
+}
+
+input,
+select,
+button,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.field {
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  width: 100%;
+}
+
+.field:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 横スクロール領域のスクロールバーを控えめに */
+.scroll-x {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}

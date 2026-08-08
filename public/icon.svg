@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1f3a63" />
+  <g
+    fill="#f3f6fb"
+    font-family="'Hiragino Mincho ProN', 'Yu Mincho', serif"
+    font-size="188"
+    font-weight="700"
+    text-anchor="middle"
+  >
+    <text x="146" y="222">四</text>
+    <text x="366" y="222">柱</text>
+    <text x="146" y="428">命</text>
+    <text x="366" y="428">式</text>
+  </g>
+</svg>
