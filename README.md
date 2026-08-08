@@ -45,8 +45,24 @@ npm run dev        # http://localhost:5173
 | `npm test` | 計算層のテスト |
 | `npm run typecheck` | 型チェック |
 
-`dist/` を静的ホスティング（Vercel、Netlify、GitHub Pages など）に置くだけで動きます。
+## 公開する
+
+アセットの参照をすべて相対パスにしてあるので、`dist/` を静的ホスティング（GitHub Pages、
+Vercel、Netlify など）に置くだけで動きます。サブディレクトリ配信でも設定を変える必要はありません。
+
 PWA として構成してあるので、スマートフォンのホーム画面に追加すればオフラインでも使えます。
+
+### GitHub Pages
+
+`.github/workflows/deploy.yml` が入っているので、**リポジトリの Settings → Pages で
+Source を「GitHub Actions」に切り替える**だけで公開できます。以降は既定ブランチに
+push するたびにテストとビルドが走り、通ったものが自動で公開されます。
+
+公開先は `https://<ユーザー名>.github.io/sityusuimei_app/` です。
+
+生年月日を他人に見られたくない場合は、リポジトリを private にしてください
+（Pages を使うには GitHub Pro などの有料プランが必要になります）。
+なお、公開されるのはアプリ本体だけで、入力した内容はあなたのブラウザから出ません。
 
 ## 時刻の扱いについて
 
