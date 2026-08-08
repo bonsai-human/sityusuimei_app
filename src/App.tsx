@@ -3,17 +3,39 @@ import { useEffect, useMemo, useState } from 'react';
 import BirthForm from './components/BirthForm';
 import PromptPanel from './components/PromptPanel';
 import ChartView from './components/chart/ChartView';
+import SaveBar from './components/chart/SaveBar';
+import CompareView from './components/compare/CompareView';
+import ChartLibrary from './components/db/ChartLibrary';
 import { Segmented } from './components/ui';
 import { buildChart } from './core/chart';
-import type { Chart } from './core/types';
+import type { BirthInput, Chart } from './core/types';
+import type { SavedChart } from './db/database';
 import { useAppStore, type Theme } from './store/appStore';
 
-type Tab = 'input' | 'chart' | 'prompt';
+type Tab = 'input' | 'chart' | 'prompt' | 'library' | 'compare';
+
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'input', label: '入力' },
+  { value: 'chart', label: '命式' },
+  { value: 'prompt', label: 'プロンプト' },
+  { value: 'library', label: '保存済み' },
+  { value: 'compare', label: '比較' },
+];
+
+/** 入力が不正でもアプリごと落ちないよう、命式の算出は必ず包む。 */
+function safeChart(input: BirthInput): { chart: Chart | null; error: string | null } {
+  try {
+    return { chart: buildChart(input), error: null };
+  } catch (e) {
+    return { chart: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 export default function App() {
   const {
     input,
     setInput,
+    replaceInput,
     theme,
     setTheme,
     pillarOrder,
@@ -23,6 +45,10 @@ export default function App() {
   } = useAppStore();
 
   const [tab, setTab] = useState<Tab>('input');
+  /** 表示中の命式が保存済みならその id。新しく入力し直したら切れる */
+  const [savedId, setSavedId] = useState<number | null>(null);
+  /** 比較の相手として選んだ命式の入力 */
+  const [compareWith, setCompareWith] = useState<BirthInput | null>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -30,16 +56,22 @@ export default function App() {
     else root.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // 入力が不正でもアプリごと落ちないよう、命式の算出は必ず包んでおく
-  const { chart, error } = useMemo((): { chart: Chart | null; error: string | null } => {
-    try {
-      return { chart: buildChart(input), error: null };
-    } catch (e) {
-      return { chart: null, error: e instanceof Error ? e.message : String(e) };
-    }
-  }, [input]);
+  const { chart, error } = useMemo(() => safeChart(input), [input]);
+  const otherChart = useMemo(
+    () => (compareWith ? safeChart(compareWith).chart : null),
+    [compareWith]
+  );
 
-  const goToChart = () => setTab(chart ? 'chart' : 'input');
+  const openSaved = (row: SavedChart) => {
+    replaceInput(row.input);
+    setSavedId(row.id ?? null);
+    setTab('chart');
+  };
+
+  const putIntoCompare = (row: SavedChart) => {
+    setCompareWith(row.input);
+    setTab('compare');
+  };
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-4xl flex-col px-3 pb-10 pt-3 sm:px-5">
@@ -75,17 +107,33 @@ export default function App() {
         </div>
       </header>
 
-      <nav className="mb-4">
-        <Segmented
-          ariaLabel="画面の切り替え"
-          value={tab}
-          onChange={(t: Tab) => setTab(t)}
-          options={[
-            { value: 'input', label: '入力' },
-            { value: 'chart', label: '命式' },
-            { value: 'prompt', label: 'プロンプト' },
-          ]}
-        />
+      {/* 画面が増えたので、狭いときは横に流して全部に手が届くようにする */}
+      <nav className="scroll-x mb-4 -mx-1 px-1">
+        <div className="flex min-w-max gap-1.5" role="group" aria-label="画面の切り替え">
+          {TABS.map((t) => {
+            const active = t.value === tab;
+            return (
+              <button
+                key={t.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setTab(t.value)}
+                className="whitespace-nowrap rounded-lg px-4 py-2 text-sm transition-colors"
+                style={{
+                  background: active ? 'var(--accent)' : 'var(--surface-raised)',
+                  color: active ? 'var(--surface-raised)' : 'var(--ink-muted)',
+                  border: `1px solid ${active ? 'transparent' : 'var(--line-strong)'}`,
+                  fontWeight: active ? 600 : 400,
+                }}
+              >
+                {t.label}
+                {t.value === 'compare' && compareWith && (
+                  <span className="ml-1 text-[10px]">●</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       {error && (
@@ -104,19 +152,56 @@ export default function App() {
 
       <main className="flex-1">
         {tab === 'input' && (
-          <BirthForm input={input} onChange={setInput} onSubmit={goToChart} />
+          <BirthForm
+            input={input}
+            onChange={(patch) => {
+              // 生年月日や時刻を変えたら別人なので、保存先との結びつきを切る
+              const identityChanged = ['year', 'month', 'day', 'time', 'gender', 'calendar'].some(
+                (k) => k in patch
+              );
+              if (identityChanged) setSavedId(null);
+              setInput(patch);
+            }}
+            onSubmit={() => setTab(chart ? 'chart' : 'input')}
+          />
         )}
+
         {tab === 'chart' &&
           (chart ? (
-            <ChartView chart={chart} pillarOrder={pillarOrder} />
+            <div className="flex flex-col gap-4">
+              <ChartView chart={chart} pillarOrder={pillarOrder} />
+              <SaveBar input={input} savedId={savedId} onSaved={setSavedId} />
+            </div>
           ) : (
             <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
               先に入力を済ませてください。
             </p>
           ))}
+
         {tab === 'prompt' &&
           (chart ? (
             <PromptPanel chart={chart} config={promptConfig} onConfigChange={setPromptConfig} />
+          ) : (
+            <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
+              先に入力を済ませてください。
+            </p>
+          ))}
+
+        {tab === 'library' && (
+          <ChartLibrary
+            onOpen={openSaved}
+            onCompare={putIntoCompare}
+            currentName={input.name}
+          />
+        )}
+
+        {tab === 'compare' &&
+          (chart ? (
+            <CompareView
+              self={chart}
+              other={otherChart}
+              onClearOther={() => setCompareWith(null)}
+            />
           ) : (
             <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
               先に入力を済ませてください。
@@ -129,7 +214,7 @@ export default function App() {
         style={{ color: 'var(--ink-faint)' }}
       >
         <p>
-          入力した内容はこのブラウザの中だけに保存され、外部に送信されることはありません。
+          入力した内容と保存した命式は、このブラウザの中だけに残ります。外部に送信されることはありません。
         </p>
         <p className="mt-1">
           四柱推命は自己理解と娯楽のためのものです。医療・法律・投資などの判断には用いないでください。

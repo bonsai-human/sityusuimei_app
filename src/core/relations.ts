@@ -70,6 +70,17 @@ export interface Relation {
   label: string;
 }
 
+/** 2 つの命式のあいだに成立する関係。どちらの柱どうしかを別に持つ。 */
+export interface CrossRelation extends Relation {
+  selfSlot: PillarSlot;
+  otherSlot: PillarSlot;
+}
+
+/** 天干どうしの関係か、地支どうしの関係か。線の描き分けに使う。 */
+export function isGanRelation(kind: RelationKind): boolean {
+  return kind === '天干合' || kind === '天干沖';
+}
+
 /* ------------------------------------------------------------------ 天干 */
 
 /** 天干五合。結びついて生じる五行を持つ。 */
@@ -191,58 +202,122 @@ function triples<T>(items: T[]): [T, T, T][] {
 }
 
 /**
- * 四柱（時柱が無い場合は三柱）から成立している関係をすべて洗い出す。
- * 三合・方合が成立しているぶんの半合は重複になるので除外する。
+ * 2 つの柱のあいだに成立する関係だけを取り出す。
+ *
+ * 命式の中の柱どうしでも、別々の命式の柱どうしでも同じ判定になるので、
+ * `findRelations`（1 つの命式の中）と `findCrossRelations`（2 つの命式のあいだ）が
+ * これを共有する。三合・方合のように 3 支そろって成立するものはここには含めない。
+ *
+ * @param skipHalfHe 三合が別途成立している局。その局の半合は重複になるので出さない
  */
-export function findRelations(pillars: RelationInput[]): Relation[] {
+export function pairRelations(
+  a: RelationInput,
+  b: RelationInput,
+  skipHalfHe?: ReadonlySet<string>
+): Relation[] {
   const out: Relation[] = [];
+  const slots: PillarSlot[] = [a.slot, b.slot];
 
-  for (const [a, b] of pairs(pillars)) {
-    for (const [x, y, el] of GAN_HE) {
-      if (pairMatches(a.gan, b.gan, x, y)) {
-        out.push({
-          kind: '天干合',
-          slots: [a.slot, b.slot],
-          chars: [a.gan, b.gan],
-          producedElement: el,
-          label: `${a.gan}${b.gan}`,
-        });
-      }
+  for (const [x, y, el] of GAN_HE) {
+    if (pairMatches(a.gan, b.gan, x, y)) {
+      out.push({
+        kind: '天干合',
+        slots,
+        chars: [a.gan, b.gan],
+        producedElement: el,
+        label: `${a.gan}${b.gan}`,
+      });
     }
-    for (const [x, y] of GAN_CHONG) {
-      if (pairMatches(a.gan, b.gan, x, y)) {
-        out.push({
-          kind: '天干沖',
-          slots: [a.slot, b.slot],
-          chars: [a.gan, b.gan],
-          label: `${a.gan}${b.gan}`,
-        });
-      }
+  }
+  for (const [x, y] of GAN_CHONG) {
+    if (pairMatches(a.gan, b.gan, x, y)) {
+      out.push({ kind: '天干沖', slots, chars: [a.gan, b.gan], label: `${a.gan}${b.gan}` });
     }
   }
 
-  // 三合・方合（三支が揃うもの）を先に取り、成立した組を覚えておく
-  const consumedBySanHe = new Set<string>();
+  for (const [x, y, el] of ZHI_HE) {
+    if (pairMatches(a.zhi, b.zhi, x, y)) {
+      out.push({
+        kind: '支合',
+        slots,
+        chars: [a.zhi, b.zhi],
+        producedElement: el,
+        label: `${a.zhi}${b.zhi}`,
+      });
+    }
+  }
+
+  // 半合は「生地＋旺地」「旺地＋墓地」の 2 通り
+  for (const [sheng, wang, mu, el] of SAN_HE) {
+    if (skipHalfHe?.has([sheng, wang, mu].sort().join(''))) continue;
+    if (pairMatches(a.zhi, b.zhi, sheng, wang) || pairMatches(a.zhi, b.zhi, wang, mu)) {
+      out.push({
+        kind: '半合',
+        slots,
+        chars: [a.zhi, b.zhi],
+        producedElement: el,
+        label: `${a.zhi}${b.zhi}`,
+      });
+    }
+  }
+
+  for (const [x, y] of ZHI_CHONG) {
+    if (pairMatches(a.zhi, b.zhi, x, y)) {
+      out.push({ kind: '沖', slots, chars: [a.zhi, b.zhi], label: `${a.zhi}${b.zhi}` });
+    }
+  }
+  for (const [x, y] of ZHI_HAI) {
+    if (pairMatches(a.zhi, b.zhi, x, y)) {
+      out.push({ kind: '害', slots, chars: [a.zhi, b.zhi], label: `${a.zhi}${b.zhi}` });
+    }
+  }
+  for (const [x, y] of ZHI_PO) {
+    if (pairMatches(a.zhi, b.zhi, x, y)) {
+      out.push({ kind: '破', slots, chars: [a.zhi, b.zhi], label: `${a.zhi}${b.zhi}` });
+    }
+  }
+  for (const [x, y, note] of XIANG_XING) {
+    if (pairMatches(a.zhi, b.zhi, x, y)) {
+      out.push({ kind: '刑', slots, chars: [a.zhi, b.zhi], label: `${x}${y}（${note}）` });
+    }
+  }
+  if (a.zhi === b.zhi && ZI_XING.includes(a.zhi)) {
+    out.push({ kind: '自刑', slots, chars: [a.zhi, b.zhi], label: `${a.zhi}${b.zhi}` });
+  }
+
+  return out;
+}
+
+/** 3 支そろって成立する関係（三合・方合・三刑）を取り出す。 */
+function tripleRelations(pillars: RelationInput[]): {
+  relations: Relation[];
+  sanHeSets: Set<string>;
+} {
+  const relations: Relation[] = [];
+  const sanHeSets = new Set<string>();
 
   for (const [a, b, c] of triples(pillars)) {
     const zs = [a.zhi, b.zhi, c.zhi];
+    if (new Set(zs).size !== 3) continue;
+    const slots: PillarSlot[] = [a.slot, b.slot, c.slot];
+
     for (const [x, y, z, el] of SAN_HE) {
-      if ([x, y, z].every((t) => zs.includes(t)) && new Set(zs).size === 3) {
-        out.push({
+      if ([x, y, z].every((t) => zs.includes(t))) {
+        relations.push({
           kind: '三合',
-          slots: [a.slot, b.slot, c.slot],
+          slots,
           chars: zs,
           producedElement: el,
           label: `${x}${y}${z}`,
         });
-        consumedBySanHe.add([x, y, z].sort().join(''));
+        sanHeSets.add([x, y, z].sort().join(''));
       }
     }
     for (const [x, y, z, el] of FANG_HE) {
-      if ([x, y, z].every((t) => zs.includes(t)) && new Set(zs).size === 3) {
-        out.push({
+      if ([x, y, z].every((t) => zs.includes(t))) {
+        relations.push({
           kind: '方合',
-          slots: [a.slot, b.slot, c.slot],
+          slots,
           chars: zs,
           producedElement: el,
           label: `${x}${y}${z}`,
@@ -250,96 +325,44 @@ export function findRelations(pillars: RelationInput[]): Relation[] {
       }
     }
     for (const [x, y, z, note] of SAN_XING) {
-      if ([x, y, z].every((t) => zs.includes(t)) && new Set(zs).size === 3) {
-        out.push({
-          kind: '刑',
-          slots: [a.slot, b.slot, c.slot],
-          chars: zs,
-          label: `${x}${y}${z}（${note}）`,
-        });
+      if ([x, y, z].every((t) => zs.includes(t))) {
+        relations.push({ kind: '刑', slots, chars: zs, label: `${x}${y}${z}（${note}）` });
       }
     }
   }
 
-  for (const [a, b] of pairs(pillars)) {
-    for (const [x, y, el] of ZHI_HE) {
-      if (pairMatches(a.zhi, b.zhi, x, y)) {
-        out.push({
-          kind: '支合',
-          slots: [a.slot, b.slot],
-          chars: [a.zhi, b.zhi],
-          producedElement: el,
-          label: `${a.zhi}${b.zhi}`,
-        });
-      }
-    }
+  return { relations, sanHeSets };
+}
 
-    // 半合は「生地＋旺地」「旺地＋墓地」の 2 通り。三合が成立済みなら出さない。
-    for (const [sheng, wang, mu, el] of SAN_HE) {
-      if (consumedBySanHe.has([sheng, wang, mu].sort().join(''))) continue;
-      const half =
-        pairMatches(a.zhi, b.zhi, sheng, wang) || pairMatches(a.zhi, b.zhi, wang, mu);
-      if (half) {
-        out.push({
-          kind: '半合',
-          slots: [a.slot, b.slot],
-          chars: [a.zhi, b.zhi],
-          producedElement: el,
-          label: `${a.zhi}${b.zhi}`,
-        });
-      }
-    }
+/**
+ * 四柱（時柱が無い場合は三柱）から成立している関係をすべて洗い出す。
+ * 三合・方合が成立しているぶんの半合は重複になるので除外する。
+ */
+export function findRelations(pillars: RelationInput[]): Relation[] {
+  const { relations, sanHeSets } = tripleRelations(pillars);
+  const out = [...relations];
+  for (const [a, b] of pairs(pillars)) out.push(...pairRelations(a, b, sanHeSets));
+  return out;
+}
 
-    for (const [x, y] of ZHI_CHONG) {
-      if (pairMatches(a.zhi, b.zhi, x, y)) {
-        out.push({
-          kind: '沖',
-          slots: [a.slot, b.slot],
-          chars: [a.zhi, b.zhi],
-          label: `${a.zhi}${b.zhi}`,
-        });
+/**
+ * 2 つの命式のあいだに成立する関係。片方の 4 柱ともう片方の 4 柱を総当たりする。
+ *
+ * 3 支そろって成立する三合・方合は、2 つの命式にまたがると「どちらの命式のものか」が
+ * 曖昧になるうえ、線で描いたときに読み取れなくなるので、ここでは 2 支の関係だけを見る。
+ */
+export function findCrossRelations(
+  self: RelationInput[],
+  other: RelationInput[]
+): CrossRelation[] {
+  const out: CrossRelation[] = [];
+  for (const a of self) {
+    for (const b of other) {
+      for (const r of pairRelations(a, b)) {
+        out.push({ ...r, selfSlot: a.slot, otherSlot: b.slot });
       }
-    }
-    for (const [x, y] of ZHI_HAI) {
-      if (pairMatches(a.zhi, b.zhi, x, y)) {
-        out.push({
-          kind: '害',
-          slots: [a.slot, b.slot],
-          chars: [a.zhi, b.zhi],
-          label: `${a.zhi}${b.zhi}`,
-        });
-      }
-    }
-    for (const [x, y] of ZHI_PO) {
-      if (pairMatches(a.zhi, b.zhi, x, y)) {
-        out.push({
-          kind: '破',
-          slots: [a.slot, b.slot],
-          chars: [a.zhi, b.zhi],
-          label: `${a.zhi}${b.zhi}`,
-        });
-      }
-    }
-    for (const [x, y, note] of XIANG_XING) {
-      if (pairMatches(a.zhi, b.zhi, x, y)) {
-        out.push({
-          kind: '刑',
-          slots: [a.slot, b.slot],
-          chars: [a.zhi, b.zhi],
-          label: `${x}${y}（${note}）`,
-        });
-      }
-    }
-    if (a.zhi === b.zhi && ZI_XING.includes(a.zhi)) {
-      out.push({
-        kind: '自刑',
-        slots: [a.slot, b.slot],
-        chars: [a.zhi, b.zhi],
-        label: `${a.zhi}${b.zhi}`,
-      });
     }
   }
-
   return out;
 }
 
