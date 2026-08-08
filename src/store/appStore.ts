@@ -6,7 +6,10 @@ import type { BirthInput } from '../core/types';
 import { TOKYO } from '../data/cities';
 
 export type Theme = 'system' | 'light' | 'dark';
-/** 四柱を並べる向き。参考にしたアプリは右から左だが、既定は日本語の読み順に合わせる。 */
+/**
+ * 四柱を並べる向き。既定は万年暦と同じ「時・日・月・年」（rtl）。
+ * 年から読みたいときは 'ltr' に切り替える。
+ */
 export type PillarOrder = 'ltr' | 'rtl';
 
 export const EMPTY_INPUT: BirthInput = {
@@ -42,6 +45,9 @@ interface AppState {
   setPromptConfig: (patch: Partial<PromptConfig>) => void;
 }
 
+/** localStorage に残す部分。操作の関数は保存しない。 */
+type PersistedState = Pick<AppState, 'input' | 'theme' | 'pillarOrder' | 'promptConfig'>;
+
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
@@ -52,7 +58,7 @@ export const useAppStore = create<AppState>()(
       theme: 'system',
       setTheme: (theme) => set({ theme }),
 
-      pillarOrder: 'ltr',
+      pillarOrder: 'rtl',
       setPillarOrder: (pillarOrder) => set({ pillarOrder }),
 
       promptConfig: defaultPromptConfig(new Date().getFullYear()),
@@ -61,9 +67,16 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'meishiki-note',
-      version: 1,
+      version: 2,
+      // v1 では四柱を「年→時」で並べていた。既定を「時→年」に変えたので、
+      // 保存済みの設定も一度そちらへ寄せる（以降は切り替えた内容がそのまま残る）
+      migrate: (persisted, version): PersistedState => {
+        const state = persisted as PersistedState;
+        if (version < 2) return { ...state, pillarOrder: 'rtl' };
+        return state;
+      },
       // 生年月日は個人情報なので、このブラウザの localStorage から外へは出さない
-      partialize: (s) => ({
+      partialize: (s): PersistedState => ({
         input: s.input,
         theme: s.theme,
         pillarOrder: s.pillarOrder,

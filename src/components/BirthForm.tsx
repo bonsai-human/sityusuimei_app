@@ -4,7 +4,16 @@ import { ZHI, type Zhi } from '../core/constants';
 import { computeCorrection, formatMinutes, meridianOf } from '../core/solarTime';
 import type { BirthInput, CalendarKind, TimeInput } from '../core/types';
 import { CITY_GROUPS, findCity } from '../data/cities';
-import { Button, Field, LabeledGroup, Note, Section, Segmented, Toggle } from './ui';
+import {
+  Button,
+  Field,
+  LabeledGroup,
+  Note,
+  NumberInput,
+  Section,
+  Segmented,
+  Toggle,
+} from './ui';
 
 const CUSTOM_PLACE = '__custom__';
 
@@ -92,37 +101,23 @@ export default function BirthForm({
 
         <div className="mt-4 grid grid-cols-3 gap-3">
           <Field label="年">
-            <input
-              className="field"
-              type="number"
-              inputMode="numeric"
+            <NumberInput
               min={1900}
               max={2100}
               value={input.year}
-              onChange={(e) => onChange({ year: Number(e.target.value) })}
+              onChange={(year) => onChange({ year })}
             />
           </Field>
           <Field label="月">
-            <input
-              className="field"
-              type="number"
-              inputMode="numeric"
+            <NumberInput
               min={1}
               max={12}
               value={input.month}
-              onChange={(e) => onChange({ month: Number(e.target.value) })}
+              onChange={(month) => onChange({ month })}
             />
           </Field>
           <Field label="日">
-            <input
-              className="field"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={31}
-              value={input.day}
-              onChange={(e) => onChange({ day: Number(e.target.value) })}
-            />
+            <NumberInput min={1} max={31} value={input.day} onChange={(day) => onChange({ day })} />
           </Field>
         </div>
         {input.calendar !== 'solar' && (
@@ -154,29 +149,19 @@ export default function BirthForm({
         {time.kind === 'hm' && (
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Field label="時">
-              <input
-                className="field"
-                type="number"
-                inputMode="numeric"
+              <NumberInput
                 min={0}
                 max={23}
                 value={time.hour}
-                onChange={(e) =>
-                  setTime({ kind: 'hm', hour: Number(e.target.value), minute: time.minute })
-                }
+                onChange={(hour) => setTime({ kind: 'hm', hour, minute: time.minute })}
               />
             </Field>
             <Field label="分">
-              <input
-                className="field"
-                type="number"
-                inputMode="numeric"
+              <NumberInput
                 min={0}
                 max={59}
                 value={time.minute}
-                onChange={(e) =>
-                  setTime({ kind: 'hm', hour: time.hour, minute: Number(e.target.value) })
-                }
+                onChange={(minute) => setTime({ kind: 'hm', hour: time.hour, minute })}
               />
             </Field>
           </div>
@@ -236,20 +221,17 @@ export default function BirthForm({
             </select>
           </Field>
           <Field label="東経（西経はマイナス）">
-            <input
-              className="field"
-              type="number"
-              inputMode="decimal"
-              step="0.0001"
+            <NumberInput
+              decimal
               min={-180}
               max={180}
               value={input.place.longitude}
-              onChange={(e) =>
+              onChange={(longitude) =>
                 onChange({
                   place: {
                     ...input.place,
                     label: findCity(input.place.label) ? '経度を指定' : input.place.label,
-                    longitude: Number(e.target.value),
+                    longitude,
                   },
                 })
               }

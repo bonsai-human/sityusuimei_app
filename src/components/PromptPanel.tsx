@@ -10,7 +10,16 @@ import {
   type PromptSections,
 } from '../core/prompt';
 import type { Chart } from '../core/types';
-import { Button, Field, LabeledGroup, Note, Section, Segmented, Toggle } from './ui';
+import {
+  Button,
+  Field,
+  LabeledGroup,
+  Note,
+  NumberInput,
+  Section,
+  Segmented,
+  Toggle,
+} from './ui';
 
 const SECTION_LABELS: { key: keyof PromptSections; label: string; hint?: string }[] = [
   { key: 'hidden', label: '蔵干（十神つき）' },
@@ -132,14 +141,11 @@ export default function PromptPanel({
             />
           </LabeledGroup>
           <Field label="基準にする年" hint="大運・流年のどこを「現在」として渡すか">
-            <input
-              className="field"
-              type="number"
-              inputMode="numeric"
+            <NumberInput
               min={1900}
               max={2100}
               value={config.focusYear}
-              onChange={(e) => onConfigChange({ focusYear: Number(e.target.value) })}
+              onChange={(focusYear) => onConfigChange({ focusYear })}
             />
           </Field>
         </div>

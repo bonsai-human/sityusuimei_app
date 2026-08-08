@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import type { Element } from '../core/constants';
 
@@ -55,6 +55,72 @@ export function Field({
         </span>
       )}
     </label>
+  );
+}
+
+/**
+ * 数値の入力欄。
+ *
+ * `<input type="number">` に `Number(e.target.value)` をそのまま渡すと、欄を空にした
+ * 瞬間に 0 が入ってしまい、1980 を消して 2003 と打つと "02003" になる。それを避けるため、
+ * 打ちかけの文字列は内部で持ち、値として意味が通るようになってから親へ渡す。
+ *
+ * 打っている途中の "2" や "20" を親へ渡すと、その値で命式を組もうとしてエラーが
+ * 一瞬出るので、範囲に収まったときだけ伝える。欄から離れたときに範囲へ丸める。
+ */
+export function NumberInput({
+  value,
+  onChange,
+  min,
+  max,
+  decimal = false,
+  ariaLabel,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  decimal?: boolean;
+  ariaLabel?: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+
+  // 都市を選び直したときなど、外から値が変わったら追従する（編集中は邪魔しない）
+  useEffect(() => {
+    if (!editing) setDraft(String(value));
+  }, [value, editing]);
+
+  const parse = (s: string) => (decimal ? Number.parseFloat(s) : Number.parseInt(s, 10));
+
+  return (
+    <input
+      className="field"
+      // type="number" だと空欄と不正な値を区別できないので text で受け、
+      // inputMode でスマートフォンには数字キーボードを出す
+      type="text"
+      inputMode={decimal ? 'decimal' : 'numeric'}
+      aria-label={ariaLabel}
+      value={draft}
+      onFocus={() => setEditing(true)}
+      onChange={(e) => {
+        const cleaned = e.target.value.replace(decimal ? /[^0-9.-]/g : /[^0-9-]/g, '');
+        setDraft(cleaned);
+        const n = parse(cleaned);
+        if (Number.isFinite(n) && n >= min && n <= max) onChange(n);
+      }}
+      onBlur={() => {
+        setEditing(false);
+        const n = parse(draft);
+        if (!Number.isFinite(n)) {
+          setDraft(String(value));
+          return;
+        }
+        const clamped = Math.min(max, Math.max(min, n));
+        onChange(clamped);
+        setDraft(String(clamped));
+      }}
+    />
   );
 }
 

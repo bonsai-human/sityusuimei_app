@@ -57,8 +57,8 @@ export default function App() {
             value={pillarOrder}
             onChange={setPillarOrder}
             options={[
-              { value: 'ltr' as const, label: '年→時', title: '年柱を左に置く' },
               { value: 'rtl' as const, label: '時→年', title: '時柱を左に置く（万年暦の並び）' },
+              { value: 'ltr' as const, label: '年→時', title: '年柱を左に置く' },
             ]}
           />
           <Segmented
