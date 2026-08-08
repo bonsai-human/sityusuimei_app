@@ -8,6 +8,7 @@
 import Dexie, { type Table } from 'dexie';
 
 import { buildChart } from '../core/chart';
+import type { EventCategory } from '../core/lifelog';
 import type { BirthInput, Chart } from '../core/types';
 
 export interface SavedChart {
@@ -33,14 +34,30 @@ export interface SavedChart {
   hourGZ: string;
 }
 
+/** 人生ログの1件。どの命式のものかを chartId で持つ。 */
+export interface LifeEventRow {
+  id?: number;
+  chartId: number;
+  /** 'YYYY-MM-DD' */
+  date: string;
+  title: string;
+  category: EventCategory;
+  note: string;
+  createdAt: number;
+}
+
 class MeishikiDatabase extends Dexie {
   charts!: Table<SavedChart, number>;
+  events!: Table<LifeEventRow, number>;
 
   constructor() {
     super('meishiki-note');
     this.version(1).stores({
       // 先頭が主キー。以降は索引を張る列
       charts: '++id, updatedAt, createdAt, birthDate, birthYear, gender, dayGZ, yearGZ, *tags',
+    });
+    this.version(2).stores({
+      events: '++id, chartId, date, [chartId+date]',
     });
   }
 }
@@ -111,7 +128,11 @@ export async function updateChart(
 }
 
 export async function deleteChart(id: number): Promise<void> {
-  await db.charts.delete(id);
+  // 命式を消したら、その人の出来事も残さない
+  await db.transaction('rw', db.charts, db.events, async () => {
+    await db.events.where('chartId').equals(id).delete();
+    await db.charts.delete(id);
+  });
 }
 
 export async function getChart(id: number): Promise<SavedChart | undefined> {
@@ -172,33 +193,78 @@ export async function countCharts(): Promise<number> {
   return db.charts.count();
 }
 
+/* ------------------------------------------------------------ 人生ログ */
+
+export async function listEvents(chartId: number): Promise<LifeEventRow[]> {
+  const rows = await db.events.where('chartId').equals(chartId).toArray();
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export async function addEvent(
+  event: Omit<LifeEventRow, 'id' | 'createdAt'>
+): Promise<number> {
+  return db.events.add({ ...event, createdAt: Date.now() });
+}
+
+export async function updateEvent(
+  id: number,
+  patch: Partial<Omit<LifeEventRow, 'id' | 'chartId' | 'createdAt'>>
+): Promise<void> {
+  await db.events.update(id, patch);
+}
+
+export async function deleteEvent(id: number): Promise<void> {
+  await db.events.delete(id);
+}
+
+export async function countEvents(chartId: number): Promise<number> {
+  return db.events.where('chartId').equals(chartId).count();
+}
+
 /* ------------------------------------------------- バックアップと復元 */
+
+export type BackupEvent = Omit<LifeEventRow, 'id' | 'chartId'>;
+
+/** 出来事は命式の入れ子にする。読み込み時に id が変わっても対応づけが崩れない。 */
+export type BackupChart = Omit<SavedChart, 'id'> & { events: BackupEvent[] };
 
 export interface Backup {
   format: 'meishiki-note';
-  version: 1;
+  version: 2;
   exportedAt: string;
-  charts: Omit<SavedChart, 'id'>[];
+  charts: BackupChart[];
 }
 
 export async function exportAll(): Promise<Backup> {
-  const rows = await db.charts.toArray();
+  const [charts, events] = await Promise.all([db.charts.toArray(), db.events.toArray()]);
+  const byChart = new Map<number, BackupEvent[]>();
+  for (const { id: _id, chartId, ...rest } of events) {
+    const list = byChart.get(chartId) ?? [];
+    list.push(rest);
+    byChart.set(chartId, list);
+  }
+
   return {
     format: 'meishiki-note',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
-    charts: rows.map(({ id: _id, ...rest }) => rest),
+    charts: charts.map(({ id, ...rest }) => ({
+      ...rest,
+      events: (byChart.get(id!) ?? []).sort((a, b) => a.date.localeCompare(b.date)),
+    })),
   };
 }
 
 export interface ImportResult {
   added: number;
   skipped: number;
+  events: number;
 }
 
 /**
  * バックアップを読み込む。同じ人を二重に増やさないよう、
  * 名前と生年月日時が一致するものは飛ばす。
+ * 出来事を持たない古い形式（version 1）も読める。
  */
 export async function importAll(data: unknown): Promise<ImportResult> {
   const backup = data as Partial<Backup>;
@@ -213,30 +279,43 @@ export async function importAll(data: unknown): Promise<ImportResult> {
 
   let added = 0;
   let skipped = 0;
-  const toAdd: Omit<SavedChart, 'id'>[] = [];
+  let eventCount = 0;
 
-  for (const row of backup.charts) {
-    if (!row?.input) {
-      skipped++;
-      continue;
-    }
-    if (seen.has(key(row))) {
-      skipped++;
-      continue;
-    }
-    seen.add(key(row));
-    // 索引用の項目は、保存時のものを信じずに組み直す
-    toAdd.push({
-      ...row,
-      memo: row.memo ?? '',
-      tags: Array.isArray(row.tags) ? row.tags : [],
-      createdAt: row.createdAt ?? Date.now(),
-      updatedAt: row.updatedAt ?? Date.now(),
-      ...deriveFields(row.input, row.memo ?? ''),
-    });
-    added++;
-  }
+  await db.transaction('rw', db.charts, db.events, async () => {
+    for (const row of backup.charts!) {
+      if (!row?.input || seen.has(key(row))) {
+        skipped++;
+        continue;
+      }
+      seen.add(key(row));
 
-  if (toAdd.length > 0) await db.charts.bulkAdd(toAdd);
-  return { added, skipped };
+      const { events, ...chartRow } = row;
+      // 索引用の項目は、保存時のものを信じずに組み直す
+      const chartId = await db.charts.add({
+        ...chartRow,
+        memo: chartRow.memo ?? '',
+        tags: Array.isArray(chartRow.tags) ? chartRow.tags : [],
+        createdAt: chartRow.createdAt ?? Date.now(),
+        updatedAt: chartRow.updatedAt ?? Date.now(),
+        ...deriveFields(chartRow.input, chartRow.memo ?? ''),
+      });
+      added++;
+
+      if (Array.isArray(events) && events.length > 0) {
+        await db.events.bulkAdd(
+          events.map((e) => ({
+            chartId,
+            date: e.date,
+            title: e.title ?? '',
+            category: e.category ?? 'その他',
+            note: e.note ?? '',
+            createdAt: e.createdAt ?? Date.now(),
+          }))
+        );
+        eventCount += events.length;
+      }
+    }
+  });
+
+  return { added, skipped, events: eventCount };
 }

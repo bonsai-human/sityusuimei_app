@@ -160,13 +160,49 @@ export function Segmented<T extends string | number>({
   onChange,
   size = 'md',
   ariaLabel,
+  wrap = false,
 }: {
   value: T;
   options: { value: T; label: string; title?: string }[];
   onChange: (value: T) => void;
   size?: 'sm' | 'md';
   ariaLabel: string;
+  /**
+   * 選択肢が多いときに使う。1 行に詰め込むと狭い画面で端が切れて押せなくなるので、
+   * 独立したボタンを折り返して並べる。
+   */
+  wrap?: boolean;
 }) {
+  const padding = size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm';
+
+  if (wrap) {
+    return (
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={ariaLabel}>
+        {options.map((o) => {
+          const active = o.value === value;
+          return (
+            <button
+              key={String(o.value)}
+              type="button"
+              title={o.title}
+              aria-pressed={active}
+              onClick={() => onChange(o.value)}
+              className={`whitespace-nowrap rounded-lg transition-colors ${padding}`}
+              style={{
+                background: active ? 'var(--accent)' : 'var(--surface-raised)',
+                color: active ? 'var(--surface-raised)' : 'var(--ink-muted)',
+                border: `1px solid ${active ? 'transparent' : 'var(--line-strong)'}`,
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div
       className="inline-flex w-full overflow-hidden rounded-lg"
@@ -183,9 +219,7 @@ export function Segmented<T extends string | number>({
             title={o.title}
             aria-pressed={active}
             onClick={() => onChange(o.value)}
-            className={`flex-1 whitespace-nowrap transition-colors ${
-              size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'
-            }`}
+            className={`flex-1 whitespace-nowrap transition-colors ${padding}`}
             style={{
               background: active ? 'var(--accent)' : 'var(--surface-raised)',
               color: active ? 'var(--surface-raised)' : 'var(--ink-muted)',

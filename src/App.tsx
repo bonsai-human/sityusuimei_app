@@ -6,13 +6,14 @@ import ChartView from './components/chart/ChartView';
 import SaveBar from './components/chart/SaveBar';
 import CompareView from './components/compare/CompareView';
 import ChartLibrary from './components/db/ChartLibrary';
+import LifeLogView from './components/lifelog/LifeLogView';
 import { Segmented } from './components/ui';
 import { buildChart } from './core/chart';
 import type { BirthInput, Chart } from './core/types';
 import type { SavedChart } from './db/database';
 import { useAppStore, type Theme } from './store/appStore';
 
-type Tab = 'input' | 'chart' | 'prompt' | 'library' | 'compare';
+type Tab = 'input' | 'chart' | 'prompt' | 'library' | 'compare' | 'lifelog';
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'input', label: '入力' },
@@ -20,6 +21,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'prompt', label: 'プロンプト' },
   { value: 'library', label: '保存済み' },
   { value: 'compare', label: '比較' },
+  { value: 'lifelog', label: '人生ログ' },
 ];
 
 /** 入力が不正でもアプリごと落ちないよう、命式の算出は必ず包む。 */
@@ -201,6 +203,19 @@ export default function App() {
               self={chart}
               other={otherChart}
               onClearOther={() => setCompareWith(null)}
+            />
+          ) : (
+            <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
+              先に入力を済ませてください。
+            </p>
+          ))}
+
+        {tab === 'lifelog' &&
+          (chart ? (
+            <LifeLogView
+              chart={chart}
+              chartId={savedId}
+              onGoToChart={() => setTab('chart')}
             />
           ) : (
             <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>

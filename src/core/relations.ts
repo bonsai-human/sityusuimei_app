@@ -6,13 +6,23 @@
 
 import { GAN, ZHI, type Element, type Gan, type Zhi } from './constants';
 
+/** 命式そのものの四柱。 */
 export type PillarSlot = 'year' | 'month' | 'day' | 'hour';
 
-export const SLOT_LABEL: Record<PillarSlot, string> = {
+/** 命式の外から巡ってくる柱。大運・流年などが命式に掛ける関係を見るのに使う。 */
+export type LuckSlot = 'daYun' | 'liuNian' | 'liuYue' | 'liuRi';
+
+export type AnySlot = PillarSlot | LuckSlot;
+
+export const SLOT_LABEL: Record<AnySlot, string> = {
   year: '年柱',
   month: '月柱',
   day: '日柱',
   hour: '時柱',
+  daYun: '大運',
+  liuNian: '流年',
+  liuYue: '流月',
+  liuRi: '日辰',
 };
 
 export type RelationKind =
@@ -62,7 +72,7 @@ export const RELATION_NOTE: Record<RelationKind, string> = {
 export interface Relation {
   kind: RelationKind;
   /** 関係に加わっている柱（2 つ、方合・三合では 3 つ） */
-  slots: PillarSlot[];
+  slots: AnySlot[];
   /** 関係に加わっている干または支 */
   chars: string[];
   /** 合によって生じる五行（合以外は undefined） */
@@ -70,10 +80,13 @@ export interface Relation {
   label: string;
 }
 
-/** 2 つの命式のあいだに成立する関係。どちらの柱どうしかを別に持つ。 */
+/**
+ * 命式と、命式の外にあるもの（別の人の命式、大運、流年）とのあいだに成立する関係。
+ * どちらの柱どうしかを別に持つ。
+ */
 export interface CrossRelation extends Relation {
-  selfSlot: PillarSlot;
-  otherSlot: PillarSlot;
+  selfSlot: AnySlot;
+  otherSlot: AnySlot;
 }
 
 /** 天干どうしの関係か、地支どうしの関係か。線の描き分けに使う。 */
@@ -173,7 +186,7 @@ const ZI_XING: Zhi[] = ['辰', '午', '酉', '亥'];
 /* ------------------------------------------------------------ 判定ロジック */
 
 export interface RelationInput {
-  slot: PillarSlot;
+  slot: AnySlot;
   gan: Gan;
   zhi: Zhi;
 }
@@ -216,7 +229,7 @@ export function pairRelations(
   skipHalfHe?: ReadonlySet<string>
 ): Relation[] {
   const out: Relation[] = [];
-  const slots: PillarSlot[] = [a.slot, b.slot];
+  const slots: AnySlot[] = [a.slot, b.slot];
 
   for (const [x, y, el] of GAN_HE) {
     if (pairMatches(a.gan, b.gan, x, y)) {
@@ -299,7 +312,7 @@ function tripleRelations(pillars: RelationInput[]): {
   for (const [a, b, c] of triples(pillars)) {
     const zs = [a.zhi, b.zhi, c.zhi];
     if (new Set(zs).size !== 3) continue;
-    const slots: PillarSlot[] = [a.slot, b.slot, c.slot];
+    const slots: AnySlot[] = [a.slot, b.slot, c.slot];
 
     for (const [x, y, z, el] of SAN_HE) {
       if ([x, y, z].every((t) => zs.includes(t))) {

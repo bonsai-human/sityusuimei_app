@@ -85,10 +85,11 @@ export default function ChartLibrary({
   const doImport = async (file: File) => {
     try {
       const result = await importAll(JSON.parse(await file.text()));
+      const events = result.events > 0 ? `、出来事${result.events}件` : '';
       setMessage(
         result.skipped > 0
-          ? `${result.added}件を読み込みました（同じ人が${result.skipped}件あったので飛ばしました）。`
-          : `${result.added}件を読み込みました。`
+          ? `${result.added}件${events}を読み込みました（同じ人が${result.skipped}件あったので飛ばしました）。`
+          : `${result.added}件${events}を読み込みました。`
       );
     } catch (e) {
       setMessage(e instanceof Error ? e.message : '読み込めませんでした。');
