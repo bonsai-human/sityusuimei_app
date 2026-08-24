@@ -7,7 +7,7 @@ import SaveBar from './components/chart/SaveBar';
 import CompareView from './components/compare/CompareView';
 import ChartLibrary from './components/db/ChartLibrary';
 import LifeLogView from './components/lifelog/LifeLogView';
-import { Note, Segmented } from './components/ui';
+import { Segmented } from './components/ui';
 import { buildChart } from './core/chart';
 import type { BirthInput, Chart } from './core/types';
 import type { SavedChart } from './db/database';
@@ -19,6 +19,7 @@ import { useAppStore, type DivinationSystem, type Theme } from './store/appStore
  */
 const HoroscopeView = lazy(() => import('./components/horoscope/HoroscopeView'));
 const HoroscopePromptPanel = lazy(() => import('./components/horoscope/HoroscopePromptPanel'));
+const SynastryView = lazy(() => import('./components/horoscope/SynastryView'));
 
 /** 遅延読み込みのあいだの表示。 */
 function Loading() {
@@ -239,14 +240,6 @@ export default function App() {
             </p>
           ))}
 
-        {/* 比較は、いまのところ四柱推命だけを扱う */}
-        {showHoroscope && tab === 'compare' && (
-          <Note>
-            この画面はいまのところ四柱推命だけに対応しています。
-            シナストリー（二人の天体どうしの角度）は、これから足します。
-          </Note>
-        )}
-
         {tab === 'prompt' &&
           (chart ? (
             <div className="flex flex-col gap-4">
@@ -295,11 +288,29 @@ export default function App() {
 
         {tab === 'compare' &&
           (chart ? (
-            <CompareView
-              self={chart}
-              other={otherChart}
-              onClearOther={() => setCompareWith(null)}
-            />
+            <div className="flex flex-col gap-4">
+              {showBazi && (
+                <CompareView
+                  self={chart}
+                  other={otherChart}
+                  onClearOther={() => setCompareWith(null)}
+                />
+              )}
+              {showHoroscope &&
+                (compareWith ? (
+                  <Suspense fallback={<Loading />}>
+                    <SynastryView self={input} other={compareWith} options={horoscopeOptions} />
+                  </Suspense>
+                ) : (
+                  !showBazi && (
+                    <CompareView
+                      self={chart}
+                      other={null}
+                      onClearOther={() => setCompareWith(null)}
+                    />
+                  )
+                ))}
+            </div>
           ) : (
             <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
               先に入力を済ませてください。
