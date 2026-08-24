@@ -45,6 +45,52 @@ function equatorialOf(lon: number, time: Astronomy.AstroTime, lng: number) {
   return { ra, dec: sph.lat, hourAngle: norm180(localSiderealDegrees(time, lng) - ra) };
 }
 
+/**
+ * 東の地平線と黄道の交点を、式を使わずに二分法で探す。
+ *
+ * `horizontalOf` は astronomy-engine の座標変換だけを通っていて、恒星時も
+ * そちらが内部で持っているものを使う。つまりこの数値解は、こちらの
+ * `localSiderealDegrees` と `ascendant` のどちらにも依存しない。
+ */
+function solveAscendant(time: Astronomy.AstroTime, lat: number, lng: number): number {
+  const altitude = (lon: number) => horizontalOf(lon, time, lat, lng).altitude;
+
+  // アセンダントの先（黄経が大きい側）は 1 室で地平線の下なので、高度は下がる向きに切る
+  let a: number | null = null;
+  for (let deg = 0; deg < 360; deg++) {
+    const here = altitude(deg);
+    const next = altitude(deg + 1);
+    if (here >= 0 && next < 0 && horizontalOf(deg, time, lat, lng).azimuth < 180) {
+      a = deg;
+      break;
+    }
+  }
+  if (a === null) throw new Error('地平線との交点が見つかりません');
+
+  let lo = a;
+  let hi = a + 1;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (altitude(mid) >= 0) lo = mid;
+    else hi = mid;
+  }
+  return norm360((lo + hi) / 2);
+}
+
+/**
+ * IAU の平均恒星時（GMST）の多項式。
+ * 恒星時はアセンダントと MC の位置をそのまま左右するので、
+ * astronomy-engine とは別の経路でも確かめておく。
+ */
+function gmstDegrees(date: Date): number {
+  const jd = date.getTime() / 86400000 + 2440587.5;
+  const d = jd - 2451545.0;
+  const t = d / 36525;
+  return norm360(
+    280.46061837 + 360.98564736629 * d + 0.000387933 * t * t - (t * t * t) / 38710000
+  );
+}
+
 const PLACES = [
   { name: '東京', lat: 35.6812, lng: 139.7671 },
   { name: 'ロンドン', lat: 51.5074, lng: -0.1276 },
@@ -70,6 +116,21 @@ describe('黄道傾斜角', () => {
   });
 });
 
+describe('恒星時', () => {
+  for (const moment of MOMENTS) {
+    it(`${moment.toISOString()} は IAU の多項式と一致する`, () => {
+      const time = Astronomy.MakeTime(moment);
+      // localSiderealDegrees は「視恒星時 ＋ 経度」なので、経度 0 で視恒星時そのもの
+      const apparent = localSiderealDegrees(time, 0);
+      const mean = gmstDegrees(moment);
+
+      // 視恒星時と平均恒星時の差は分点差（equation of the equinoxes）で、
+      // 時間にして ±1.1 秒、角度にして ±0.0046 度を超えない
+      expect(Math.abs(norm180(apparent - mean))).toBeLessThan(0.005);
+    });
+  }
+});
+
 describe('アセンダント', () => {
   for (const place of PLACES) {
     for (const moment of MOMENTS) {
@@ -85,6 +146,11 @@ describe('アセンダント', () => {
         // 東半分（方位 0〜180 度）にある。西の交点を掴んでいたらここで落ちる
         expect(azimuth).toBeGreaterThan(0);
         expect(azimuth).toBeLessThan(180);
+
+        // 式を使わずに二分法で詰めた交点と、1 秒角まで一致する
+        expect(Math.abs(norm180(asc - solveAscendant(time, place.lat, place.lng)))).toBeLessThan(
+          1 / 3600
+        );
       });
     }
   }
