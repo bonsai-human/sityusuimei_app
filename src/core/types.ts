@@ -16,6 +16,13 @@ export interface BirthPlace {
   label: string;
   /** 東経を正とする経度（度） */
   longitude: number;
+  /**
+   * 北緯を正とする緯度（度）。
+   *
+   * 四柱推命では使わないので、緯度を持たない時代に保存した命式では null になる。
+   * ホロスコープのアセンダントとハウスは緯度が無いと出せないので、そのときは入力を促す。
+   */
+  latitude: number | null;
   /** 標準時のUTCオフセット（分）。日本なら 540 */
   tzOffsetMinutes: number;
 }

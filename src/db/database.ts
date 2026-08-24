@@ -10,6 +10,7 @@ import Dexie, { type Table } from 'dexie';
 import { buildChart } from '../core/chart';
 import type { EventCategory } from '../core/lifelog';
 import type { BirthInput, Chart } from '../core/types';
+import { withLatitude } from '../data/cities';
 
 export interface SavedChart {
   id?: number;
@@ -59,6 +60,17 @@ class MeishikiDatabase extends Dexie {
     this.version(2).stores({
       events: '++id, chartId, date, [chartId+date]',
     });
+    // v2 までに保存した出生地は緯度を持たない。索引は変わらないので、中身だけ直す
+    this.version(3)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table<SavedChart>('charts')
+          .toCollection()
+          .modify((row) => {
+            if (row.input?.place) row.input.place = withLatitude(row.input.place);
+          })
+      );
   }
 }
 
@@ -290,6 +302,10 @@ export async function importAll(data: unknown): Promise<ImportResult> {
       seen.add(key(row));
 
       const { events, ...chartRow } = row;
+      // 緯度を持たない時代に書き出したバックアップも読めるようにする
+      if (chartRow.input?.place) {
+        chartRow.input = { ...chartRow.input, place: withLatitude(chartRow.input.place) };
+      }
       // 索引用の項目は、保存時のものを信じずに組み直す
       const chartId = await db.charts.add({
         ...chartRow,

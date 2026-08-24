@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 import { defaultPromptConfig, type PromptConfig } from '../core/prompt';
 import type { BirthInput } from '../core/types';
-import { TOKYO } from '../data/cities';
+import { TOKYO, withLatitude } from '../data/cities';
 
 export type Theme = 'system' | 'light' | 'dark';
 /**
@@ -67,12 +67,16 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'meishiki-note',
-      version: 2,
-      // v1 では四柱を「年→時」で並べていた。既定を「時→年」に変えたので、
-      // 保存済みの設定も一度そちらへ寄せる（以降は切り替えた内容がそのまま残る）
+      version: 3,
       migrate: (persisted, version): PersistedState => {
-        const state = persisted as PersistedState;
-        if (version < 2) return { ...state, pillarOrder: 'rtl' };
+        let state = persisted as PersistedState;
+        // v1 では四柱を「年→時」で並べていた。既定を「時→年」に変えたので、
+        // 保存済みの設定も一度そちらへ寄せる（以降は切り替えた内容がそのまま残る）
+        if (version < 2) state = { ...state, pillarOrder: 'rtl' };
+        // v2 までの出生地は緯度を持たない。ホロスコープに要るので、都市名から補う
+        if (version < 3 && state.input?.place) {
+          state = { ...state, input: { ...state.input, place: withLatitude(state.input.place) } };
+        }
         return state;
       },
       // 生年月日は個人情報なので、このブラウザの localStorage から外へは出さない

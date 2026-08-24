@@ -75,20 +75,24 @@ export function NumberInput({
   max,
   decimal = false,
   ariaLabel,
+  placeholder,
 }: {
-  value: number;
+  /** null なら未入力（空欄）として表示する */
+  value: number | null;
   onChange: (value: number) => void;
   min: number;
   max: number;
   decimal?: boolean;
   ariaLabel?: string;
+  placeholder?: string;
 }) {
-  const [draft, setDraft] = useState(String(value));
+  const text = (v: number | null) => (v == null ? '' : String(v));
+  const [draft, setDraft] = useState(text(value));
   const [editing, setEditing] = useState(false);
 
   // 都市を選び直したときなど、外から値が変わったら追従する（編集中は邪魔しない）
   useEffect(() => {
-    if (!editing) setDraft(String(value));
+    if (!editing) setDraft(text(value));
   }, [value, editing]);
 
   const parse = (s: string) => (decimal ? Number.parseFloat(s) : Number.parseInt(s, 10));
@@ -101,6 +105,7 @@ export function NumberInput({
       type="text"
       inputMode={decimal ? 'decimal' : 'numeric'}
       aria-label={ariaLabel}
+      placeholder={placeholder}
       value={draft}
       onFocus={() => setEditing(true)}
       onChange={(e) => {
@@ -113,7 +118,7 @@ export function NumberInput({
         setEditing(false);
         const n = parse(draft);
         if (!Number.isFinite(n)) {
-          setDraft(String(value));
+          setDraft(text(value));
           return;
         }
         const clamped = Math.min(max, Math.max(min, n));

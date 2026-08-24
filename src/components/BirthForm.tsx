@@ -201,7 +201,7 @@ export default function BirthForm({
               value={selectedCity}
               onChange={(e) => {
                 if (e.target.value === CUSTOM_PLACE) {
-                  onChange({ place: { ...input.place, label: '経度を指定' } });
+                  onChange({ place: { ...input.place, label: '座標を指定' } });
                   return;
                 }
                 const city = findCity(e.target.value);
@@ -217,10 +217,10 @@ export default function BirthForm({
                   ))}
                 </optgroup>
               ))}
-              <option value={CUSTOM_PLACE}>そのほか（経度を直接入力）</option>
+              <option value={CUSTOM_PLACE}>そのほか（座標を直接入力）</option>
             </select>
           </Field>
-          <Field label="東経（西経はマイナス）">
+          <Field label="東経（西経はマイナス）" hint="四柱推命の真太陽時の補正に使います">
             <NumberInput
               decimal
               min={-180}
@@ -230,14 +230,42 @@ export default function BirthForm({
                 onChange({
                   place: {
                     ...input.place,
-                    label: findCity(input.place.label) ? '経度を指定' : input.place.label,
+                    label: findCity(input.place.label) ? '座標を指定' : input.place.label,
                     longitude,
                   },
                 })
               }
             />
           </Field>
+          <Field
+            label="北緯（南緯はマイナス）"
+            hint="ホロスコープのアセンダントとハウスに使います。四柱推命には影響しません"
+          >
+            <NumberInput
+              decimal
+              min={-90}
+              max={90}
+              placeholder="未入力"
+              value={input.place.latitude}
+              onChange={(latitude) =>
+                onChange({
+                  place: {
+                    ...input.place,
+                    label: findCity(input.place.label) ? '座標を指定' : input.place.label,
+                    latitude,
+                  },
+                })
+              }
+            />
+          </Field>
         </div>
+
+        {input.place.latitude == null && (
+          <Note>
+            緯度が未入力です。四柱推命の命式はこのままでも組めますが、
+            ホロスコープのアセンダントとハウスは緯度が無いと出せません。
+          </Note>
+        )}
 
         <div className="mt-3">
           <Toggle
