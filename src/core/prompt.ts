@@ -389,7 +389,11 @@ function renderMarkdown(chart: Chart, config: PromptConfig): string {
 
 /* ------------------------------------------------------------------ JSON */
 
-function renderJson(chart: Chart, config: PromptConfig): string {
+/**
+ * JSON 形式の中身。
+ * ホロスコープと並べて 1 つの JSON にするときにも使うので、文字列にする前で返す。
+ */
+export function chartJson(chart: Chart, config: PromptConfig): Record<string, unknown> {
   const s = config.sections;
   const current = currentDaYun(chart, config.focusYear);
 
@@ -493,7 +497,11 @@ function renderJson(chart: Chart, config: PromptConfig): string {
     };
   }
 
-  return JSON.stringify(payload, null, 2);
+  return payload;
+}
+
+function renderJson(chart: Chart, config: PromptConfig): string {
+  return JSON.stringify(chartJson(chart, config), null, 2);
 }
 
 /* --------------------------------------------------------------- Compact */
@@ -557,6 +565,25 @@ function renderCompact(chart: Chart, config: PromptConfig): string {
 
 /* ------------------------------------------------------------------ 本体 */
 
+/**
+ * 命式の本体だけを、指定の形式で組み立てる。依頼文も回答の作法も付かない。
+ * ホロスコープと並べた統合プロンプトから、命式の側として呼ぶ。
+ */
+export function renderChartBody(chart: Chart, config: PromptConfig): string {
+  if (config.format === 'json') return renderJson(chart, config);
+  if (config.format === 'compact') return renderCompact(chart, config);
+  return renderMarkdown(chart, config);
+}
+
+/** 命式をどう算出したかの断り。プロンプトの末尾に付ける。 */
+export function chartFootnote(chart: Chart): string {
+  return (
+    `※ 命式は「命式ノート」で算出したものです。真太陽時の補正${
+      chart.input.options.trueSolarTime ? 'あり' : 'なし'
+    }、23時台は${chart.input.options.lateZi ? '夜子時説' : '早子時説'}で扱っています。`
+  );
+}
+
 export function buildPrompt(chart: Chart, config: PromptConfig): string {
   const template = PROMPT_TEMPLATES.find((t) => t.id === config.templateId)!;
   const ask =
@@ -565,12 +592,7 @@ export function buildPrompt(chart: Chart, config: PromptConfig): string {
         '以下の四柱推命の命式について、気づいたことを述べてください。'
       : template.ask;
 
-  const body =
-    config.format === 'json'
-      ? renderJson(chart, config)
-      : config.format === 'compact'
-        ? renderCompact(chart, config)
-        : renderMarkdown(chart, config);
+  const body = renderChartBody(chart, config);
 
   const rules = STYLE_RULES.filter((r) => config.styleRuleIds.includes(r.id));
 
@@ -589,14 +611,7 @@ export function buildPrompt(chart: Chart, config: PromptConfig): string {
     for (const r of rules) parts.push(`- ${r.text}`);
   }
 
-  parts.push(
-    '',
-    '---',
-    '',
-    `※ 命式は「命式ノート」で算出したものです。真太陽時の補正${
-      chart.input.options.trueSolarTime ? 'あり' : 'なし'
-    }、23時台は${chart.input.options.lateZi ? '夜子時説' : '早子時説'}で扱っています。`
-  );
+  parts.push('', '---', '', chartFootnote(chart));
 
   return parts.join('\n');
 }

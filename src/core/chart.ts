@@ -114,7 +114,7 @@ function wallOfSolar(s: {
 }
 
 /** 入力された暦の日付を、グレゴリオ暦の年月日に正規化する。 */
-function resolveSolarDate(input: BirthInput): { y: number; m: number; d: number } {
+export function resolveSolarDate(input: BirthInput): { y: number; m: number; d: number } {
   if (input.calendar === 'solar') {
     return { y: input.year, m: input.month, d: input.day };
   }

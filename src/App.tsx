@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 
 import BirthForm from './components/BirthForm';
 import PromptPanel from './components/PromptPanel';
@@ -11,7 +11,24 @@ import { Segmented } from './components/ui';
 import { buildChart } from './core/chart';
 import type { BirthInput, Chart } from './core/types';
 import type { SavedChart } from './db/database';
-import { useAppStore, type Theme } from './store/appStore';
+import { useAppStore, type DivinationSystem, type Theme } from './store/appStore';
+
+/**
+ * ホロスコープの画面は遅延読み込みにする。
+ * 天体暦（astronomy-engine）はここからしか参照しないので、四柱推命だけを使う人は読み込まない。
+ */
+const HoroscopeView = lazy(() => import('./components/horoscope/HoroscopeView'));
+const HoroscopePromptPanel = lazy(() => import('./components/horoscope/HoroscopePromptPanel'));
+const SynastryView = lazy(() => import('./components/horoscope/SynastryView'));
+
+/** 遅延読み込みのあいだの表示。 */
+function Loading() {
+  return (
+    <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
+      天体暦を読み込んでいます…
+    </p>
+  );
+}
 
 type Tab = 'input' | 'chart' | 'prompt' | 'library' | 'compare' | 'lifelog';
 
@@ -44,13 +61,24 @@ export default function App() {
     setPillarOrder,
     promptConfig,
     setPromptConfig,
+    system,
+    setSystem,
+    horoscopeOptions,
+    setHoroscopeOptions,
+    horoscopePromptConfig,
+    setHoroscopePromptConfig,
   } = useAppStore();
+
+  const showBazi = system !== 'horoscope';
+  const showHoroscope = system !== 'bazi';
 
   const [tab, setTab] = useState<Tab>('input');
   /** 表示中の命式が保存済みならその id。新しく入力し直したら切れる */
   const [savedId, setSavedId] = useState<number | null>(null);
   /** 比較の相手として選んだ命式の入力 */
   const [compareWith, setCompareWith] = useState<BirthInput | null>(null);
+  /** 両方を見ているとき、プロンプトの画面でどちらを組み立てるか */
+  const [promptSystem, setPromptSystem] = useState<'bazi' | 'horoscope'>('bazi');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -81,20 +109,33 @@ export default function App() {
         <div>
           <h1 className="text-lg font-bold tracking-tight">命式ノート</h1>
           <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
-            四柱推命の命式を組み、AI に渡すプロンプトを書き出す
+            四柱推命とホロスコープを組み、AI に渡すプロンプトを書き出す
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Segmented
-            ariaLabel="四柱を並べる向き"
+            ariaLabel="占術"
             size="sm"
-            value={pillarOrder}
-            onChange={setPillarOrder}
+            value={system}
+            onChange={(s: DivinationSystem) => setSystem(s)}
             options={[
-              { value: 'rtl' as const, label: '時→年', title: '時柱を左に置く（万年暦の並び）' },
-              { value: 'ltr' as const, label: '年→時', title: '年柱を左に置く' },
+              { value: 'bazi' as const, label: '四柱推命' },
+              { value: 'horoscope' as const, label: 'ホロスコープ' },
+              { value: 'both' as const, label: '両方' },
             ]}
           />
+          {showBazi && (
+            <Segmented
+              ariaLabel="四柱を並べる向き"
+              size="sm"
+              value={pillarOrder}
+              onChange={setPillarOrder}
+              options={[
+                { value: 'rtl' as const, label: '時→年', title: '時柱を左に置く（万年暦の並び）' },
+                { value: 'ltr' as const, label: '年→時', title: '年柱を左に置く' },
+              ]}
+            />
+          )}
           <Segmented
             ariaLabel="配色"
             size="sm"
@@ -114,6 +155,9 @@ export default function App() {
         <div className="flex min-w-max gap-1.5" role="group" aria-label="画面の切り替え">
           {TABS.map((t) => {
             const active = t.value === tab;
+            // ホロスコープだけを見ているときは「命式」の札が合わないので、名前を変える
+            const label =
+              t.value === 'chart' && system === 'horoscope' ? 'ホロスコープ' : t.label;
             return (
               <button
                 key={t.value}
@@ -128,7 +172,7 @@ export default function App() {
                   fontWeight: active ? 600 : 400,
                 }}
               >
-                {t.label}
+                {label}
                 {t.value === 'compare' && compareWith && (
                   <span className="ml-1 text-[10px]">●</span>
                 )}
@@ -165,13 +209,29 @@ export default function App() {
               setInput(patch);
             }}
             onSubmit={() => setTab(chart ? 'chart' : 'input')}
+            submitLabel={
+              system === 'horoscope'
+                ? 'ホロスコープを組む'
+                : system === 'both'
+                  ? '命式とホロスコープを組む'
+                  : '命式を組む'
+            }
           />
         )}
 
         {tab === 'chart' &&
           (chart ? (
             <div className="flex flex-col gap-4">
-              <ChartView chart={chart} pillarOrder={pillarOrder} />
+              {showBazi && <ChartView chart={chart} pillarOrder={pillarOrder} />}
+              {showHoroscope && (
+                <Suspense fallback={<Loading />}>
+                  <HoroscopeView
+                    input={input}
+                    options={horoscopeOptions}
+                    onOptionsChange={setHoroscopeOptions}
+                  />
+                </Suspense>
+              )}
               <SaveBar input={input} savedId={savedId} onSaved={setSavedId} />
             </div>
           ) : (
@@ -182,7 +242,36 @@ export default function App() {
 
         {tab === 'prompt' &&
           (chart ? (
-            <PromptPanel chart={chart} config={promptConfig} onConfigChange={setPromptConfig} />
+            <div className="flex flex-col gap-4">
+              {/* 両方見ているときは、どちらのプロンプトを組むかを選ぶ。
+                  二つ並べると「できあがったプロンプト」が 2 つになって取り違える */}
+              {showBazi && showHoroscope && (
+                <Segmented
+                  ariaLabel="どちらのプロンプトを組むか"
+                  value={promptSystem}
+                  onChange={setPromptSystem}
+                  options={[
+                    { value: 'bazi' as const, label: '四柱推命' },
+                    { value: 'horoscope' as const, label: 'ホロスコープ・併記' },
+                  ]}
+                />
+              )}
+              {showBazi && (!showHoroscope || promptSystem === 'bazi') && (
+                <PromptPanel chart={chart} config={promptConfig} onConfigChange={setPromptConfig} />
+              )}
+              {showHoroscope && (!showBazi || promptSystem === 'horoscope') && (
+                <Suspense fallback={<Loading />}>
+                  <HoroscopePromptPanel
+                    input={input}
+                    options={horoscopeOptions}
+                    chart={showBazi ? chart : null}
+                    config={horoscopePromptConfig}
+                    onConfigChange={setHoroscopePromptConfig}
+                    chartConfig={promptConfig}
+                  />
+                </Suspense>
+              )}
+            </div>
           ) : (
             <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
               先に入力を済ませてください。
@@ -199,11 +288,29 @@ export default function App() {
 
         {tab === 'compare' &&
           (chart ? (
-            <CompareView
-              self={chart}
-              other={otherChart}
-              onClearOther={() => setCompareWith(null)}
-            />
+            <div className="flex flex-col gap-4">
+              {showBazi && (
+                <CompareView
+                  self={chart}
+                  other={otherChart}
+                  onClearOther={() => setCompareWith(null)}
+                />
+              )}
+              {showHoroscope &&
+                (compareWith ? (
+                  <Suspense fallback={<Loading />}>
+                    <SynastryView self={input} other={compareWith} options={horoscopeOptions} />
+                  </Suspense>
+                ) : (
+                  !showBazi && (
+                    <CompareView
+                      self={chart}
+                      other={null}
+                      onClearOther={() => setCompareWith(null)}
+                    />
+                  )
+                ))}
+            </div>
           ) : (
             <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
               先に入力を済ませてください。
@@ -216,6 +323,7 @@ export default function App() {
               chart={chart}
               chartId={savedId}
               onGoToChart={() => setTab('chart')}
+              horoscopeOptions={showHoroscope ? horoscopeOptions : null}
             />
           ) : (
             <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
@@ -232,7 +340,8 @@ export default function App() {
           入力した内容と保存した命式は、このブラウザの中だけに残ります。外部に送信されることはありません。
         </p>
         <p className="mt-1">
-          四柱推命は自己理解と娯楽のためのものです。医療・法律・投資などの判断には用いないでください。
+          四柱推命もホロスコープも、自己理解と娯楽のためのものです。
+          医療・法律・投資などの判断には用いないでください。
         </p>
       </footer>
     </div>
