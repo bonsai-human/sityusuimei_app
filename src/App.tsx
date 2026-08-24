@@ -18,6 +18,16 @@ import { useAppStore, type DivinationSystem, type Theme } from './store/appStore
  * 天体暦（astronomy-engine）はここからしか参照しないので、四柱推命だけを使う人は読み込まない。
  */
 const HoroscopeView = lazy(() => import('./components/horoscope/HoroscopeView'));
+const HoroscopePromptPanel = lazy(() => import('./components/horoscope/HoroscopePromptPanel'));
+
+/** 遅延読み込みのあいだの表示。 */
+function Loading() {
+  return (
+    <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
+      天体暦を読み込んでいます…
+    </p>
+  );
+}
 
 type Tab = 'input' | 'chart' | 'prompt' | 'library' | 'compare' | 'lifelog';
 
@@ -54,6 +64,8 @@ export default function App() {
     setSystem,
     horoscopeOptions,
     setHoroscopeOptions,
+    horoscopePromptConfig,
+    setHoroscopePromptConfig,
   } = useAppStore();
 
   const showBazi = system !== 'horoscope';
@@ -64,6 +76,8 @@ export default function App() {
   const [savedId, setSavedId] = useState<number | null>(null);
   /** 比較の相手として選んだ命式の入力 */
   const [compareWith, setCompareWith] = useState<BirthInput | null>(null);
+  /** 両方を見ているとき、プロンプトの画面でどちらを組み立てるか */
+  const [promptSystem, setPromptSystem] = useState<'bazi' | 'horoscope'>('bazi');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -209,13 +223,7 @@ export default function App() {
             <div className="flex flex-col gap-4">
               {showBazi && <ChartView chart={chart} pillarOrder={pillarOrder} />}
               {showHoroscope && (
-                <Suspense
-                  fallback={
-                    <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
-                      天体暦を読み込んでいます…
-                    </p>
-                  }
-                >
+                <Suspense fallback={<Loading />}>
                   <HoroscopeView
                     input={input}
                     options={horoscopeOptions}
@@ -231,17 +239,46 @@ export default function App() {
             </p>
           ))}
 
-        {/* プロンプト・比較・人生ログは、いまのところ四柱推命だけを扱う */}
-        {showHoroscope && tab !== 'input' && tab !== 'chart' && tab !== 'library' && (
+        {/* 比較・人生ログは、いまのところ四柱推命だけを扱う */}
+        {showHoroscope && (tab === 'compare' || tab === 'lifelog') && (
           <Note>
-            この画面はいまのところ四柱推命だけに対応しています。ホロスコープのプロンプト、
-            シナストリー（相性）、トランジットは、これから足していきます。
+            この画面はいまのところ四柱推命だけに対応しています。
+            シナストリー（相性）とトランジットは、これから足していきます。
           </Note>
         )}
 
         {tab === 'prompt' &&
           (chart ? (
-            <PromptPanel chart={chart} config={promptConfig} onConfigChange={setPromptConfig} />
+            <div className="flex flex-col gap-4">
+              {/* 両方見ているときは、どちらのプロンプトを組むかを選ぶ。
+                  二つ並べると「できあがったプロンプト」が 2 つになって取り違える */}
+              {showBazi && showHoroscope && (
+                <Segmented
+                  ariaLabel="どちらのプロンプトを組むか"
+                  value={promptSystem}
+                  onChange={setPromptSystem}
+                  options={[
+                    { value: 'bazi' as const, label: '四柱推命' },
+                    { value: 'horoscope' as const, label: 'ホロスコープ・併記' },
+                  ]}
+                />
+              )}
+              {showBazi && (!showHoroscope || promptSystem === 'bazi') && (
+                <PromptPanel chart={chart} config={promptConfig} onConfigChange={setPromptConfig} />
+              )}
+              {showHoroscope && (!showBazi || promptSystem === 'horoscope') && (
+                <Suspense fallback={<Loading />}>
+                  <HoroscopePromptPanel
+                    input={input}
+                    options={horoscopeOptions}
+                    chart={showBazi ? chart : null}
+                    config={horoscopePromptConfig}
+                    onConfigChange={setHoroscopePromptConfig}
+                    chartConfig={promptConfig}
+                  />
+                </Suspense>
+              )}
+            </div>
           ) : (
             <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
               先に入力を済ませてください。

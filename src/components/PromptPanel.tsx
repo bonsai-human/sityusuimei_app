@@ -1,25 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import {
   PROMPT_TEMPLATES,
   STYLE_RULES,
   buildPrompt,
-  estimateTokens,
   type PromptConfig,
   type PromptFormat,
   type PromptSections,
 } from '../core/prompt';
 import type { Chart } from '../core/types';
-import {
-  Button,
-  Field,
-  LabeledGroup,
-  Note,
-  NumberInput,
-  Section,
-  Segmented,
-  Toggle,
-} from './ui';
+import PromptOutput from './PromptOutput';
+import { Field, LabeledGroup, NumberInput, Section, Segmented, Toggle } from './ui';
 
 const SECTION_LABELS: { key: keyof PromptSections; label: string; hint?: string }[] = [
   { key: 'hidden', label: '蔵干（十神つき）' },
@@ -49,34 +40,8 @@ export default function PromptPanel({
   config: PromptConfig;
   onConfigChange: (patch: Partial<PromptConfig>) => void;
 }) {
-  const [copied, setCopied] = useState(false);
   const template = PROMPT_TEMPLATES.find((t) => t.id === config.templateId)!;
-
   const text = useMemo(() => buildPrompt(chart, config), [chart, config]);
-  const tokens = useMemo(() => estimateTokens(text), [text]);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // クリップボードが使えない環境（http や権限なし）では選択してもらう
-      const area = document.getElementById('prompt-output') as HTMLTextAreaElement | null;
-      area?.select();
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  };
-
-  const download = (kind: 'md' | 'json' | 'txt') => {
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const name = (chart.input.name.trim() || 'meishiki').replace(/[^\w一-龯ぁ-んァ-ヶー]/g, '');
-    a.href = url;
-    a.download = `${name}-${config.templateId}.${kind}`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const toggleSection = (key: keyof PromptSections) =>
     onConfigChange({ sections: { ...config.sections, [key]: !config.sections[key] } });
@@ -188,37 +153,11 @@ export default function PromptPanel({
         </Section>
       </div>
 
-      <Section
-        title="できあがったプロンプト"
-        subtitle={`${text.length.toLocaleString()}文字・およそ ${tokens.toLocaleString()} トークン`}
-        actions={
-          <div className="flex gap-2">
-            <Button onClick={copy} variant="primary">
-              {copied ? 'コピーしました' : 'コピー'}
-            </Button>
-            <Button
-              onClick={() =>
-                download(config.format === 'json' ? 'json' : config.format === 'compact' ? 'txt' : 'md')
-              }
-            >
-              保存
-            </Button>
-          </div>
-        }
-      >
-        <textarea
-          id="prompt-output"
-          readOnly
-          value={text}
-          spellCheck={false}
-          className="field min-h-96 w-full resize-y font-mono text-xs leading-relaxed"
-          style={{ background: 'var(--surface-sunken)' }}
-        />
-        <Note>
-          このテキストは ChatGPT・Claude・Gemini など、どのチャットにもそのまま貼れます。
-          外部に送信されるのは、あなたが貼り付けたときだけです。
-        </Note>
-      </Section>
+      <PromptOutput
+        text={text}
+        format={config.format}
+        fileName={`${chart.input.name.trim() || 'meishiki'}-${config.templateId}`}
+      />
     </div>
   );
 }

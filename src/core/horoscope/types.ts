@@ -1,3 +1,4 @@
+import type { PromptFormat } from '../prompt';
 import type { BirthInput } from '../types';
 import { DEFAULT_LUMINARY_BONUS, DEFAULT_ORBS } from './constants';
 import type {
@@ -175,4 +176,63 @@ export interface Horoscope {
   /** 東（アセンダント側）・西・南（MC 側）・北 に何天体あるか */
   hemispheres: { east: number; west: number; south: number; north: number } | null;
   meta: HoroscopeMeta;
+}
+
+/* ------------------------------------------------- プロンプトの設定 */
+
+export type HoroscopePromptTemplateId =
+  | 'overview'
+  | 'work'
+  | 'relationship'
+  | 'inner'
+  | 'health'
+  | 'free'
+  | 'combined';
+
+/** 出生図のどの情報をプロンプトに含めるか。 */
+export interface HoroscopePromptSections {
+  angles: boolean;
+  houses: boolean;
+  aspects: boolean;
+  elements: boolean;
+  patterns: boolean;
+  nodes: boolean;
+  speed: boolean;
+  timeDetail: boolean;
+  glossary: boolean;
+}
+
+export const DEFAULT_HOROSCOPE_SECTIONS: HoroscopePromptSections = {
+  angles: true,
+  houses: true,
+  aspects: true,
+  elements: true,
+  patterns: true,
+  nodes: true,
+  speed: false,
+  timeDetail: true,
+  glossary: false,
+};
+
+export interface HoroscopePromptConfig {
+  templateId: HoroscopePromptTemplateId;
+  format: PromptFormat;
+  sections: HoroscopePromptSections;
+  styleRuleIds: string[];
+  freeText?: string;
+  anonymize: boolean;
+}
+
+/**
+ * プロンプトの設定の既定値。
+ * `defaultHoroscopeOptions` と同じ理由で、天体暦もプロンプトの組み立ても引かない場所に置く。
+ */
+export function defaultHoroscopePromptConfig(styleRuleIds: string[]): HoroscopePromptConfig {
+  return {
+    templateId: 'overview',
+    format: 'markdown',
+    sections: { ...DEFAULT_HOROSCOPE_SECTIONS },
+    styleRuleIds,
+    anonymize: false,
+  };
 }
