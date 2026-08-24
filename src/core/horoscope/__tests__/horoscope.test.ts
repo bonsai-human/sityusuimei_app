@@ -13,7 +13,7 @@ import {
 } from '../bodies';
 import { buildHouses, houseOf } from '../houses';
 import { norm180, norm360, separation, signPosition } from '../math';
-import { defaultHoroscopeOptions } from '../chart';
+import { defaultHoroscopeOptions } from '../types';
 
 /**
  * 検算の当て。

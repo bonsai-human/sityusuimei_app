@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { defaultHoroscopeOptions, type HoroscopeOptions } from '../core/horoscope/types';
 import { defaultPromptConfig, type PromptConfig } from '../core/prompt';
 import type { BirthInput } from '../core/types';
 import { TOKYO, withLatitude } from '../data/cities';
@@ -11,6 +12,9 @@ export type Theme = 'system' | 'light' | 'dark';
  * 年から読みたいときは 'ltr' に切り替える。
  */
 export type PillarOrder = 'ltr' | 'rtl';
+
+/** どの占術で読むか。'both' は命式とホロスコープを縦に並べる。 */
+export type DivinationSystem = 'bazi' | 'horoscope' | 'both';
 
 export const EMPTY_INPUT: BirthInput = {
   name: '',
@@ -41,12 +45,21 @@ interface AppState {
   pillarOrder: PillarOrder;
   setPillarOrder: (order: PillarOrder) => void;
 
+  system: DivinationSystem;
+  setSystem: (system: DivinationSystem) => void;
+
+  horoscopeOptions: HoroscopeOptions;
+  setHoroscopeOptions: (patch: Partial<HoroscopeOptions>) => void;
+
   promptConfig: PromptConfig;
   setPromptConfig: (patch: Partial<PromptConfig>) => void;
 }
 
 /** localStorage に残す部分。操作の関数は保存しない。 */
-type PersistedState = Pick<AppState, 'input' | 'theme' | 'pillarOrder' | 'promptConfig'>;
+type PersistedState = Pick<
+  AppState,
+  'input' | 'theme' | 'pillarOrder' | 'promptConfig' | 'system' | 'horoscopeOptions'
+>;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -61,13 +74,20 @@ export const useAppStore = create<AppState>()(
       pillarOrder: 'rtl',
       setPillarOrder: (pillarOrder) => set({ pillarOrder }),
 
+      system: 'bazi',
+      setSystem: (system) => set({ system }),
+
+      horoscopeOptions: defaultHoroscopeOptions(),
+      setHoroscopeOptions: (patch) =>
+        set((s) => ({ horoscopeOptions: { ...s.horoscopeOptions, ...patch } })),
+
       promptConfig: defaultPromptConfig(new Date().getFullYear()),
       setPromptConfig: (patch) =>
         set((s) => ({ promptConfig: { ...s.promptConfig, ...patch } })),
     }),
     {
       name: 'meishiki-note',
-      version: 3,
+      version: 4,
       migrate: (persisted, version): PersistedState => {
         let state = persisted as PersistedState;
         // v1 では四柱を「年→時」で並べていた。既定を「時→年」に変えたので、
@@ -77,6 +97,14 @@ export const useAppStore = create<AppState>()(
         if (version < 3 && state.input?.place) {
           state = { ...state, input: { ...state.input, place: withLatitude(state.input.place) } };
         }
+        // v3 まではホロスコープが無かった。既定値を入れておく
+        if (version < 4) {
+          state = {
+            ...state,
+            system: 'bazi',
+            horoscopeOptions: defaultHoroscopeOptions(),
+          };
+        }
         return state;
       },
       // 生年月日は個人情報なので、このブラウザの localStorage から外へは出さない
@@ -85,6 +113,8 @@ export const useAppStore = create<AppState>()(
         theme: s.theme,
         pillarOrder: s.pillarOrder,
         promptConfig: s.promptConfig,
+        system: s.system,
+        horoscopeOptions: s.horoscopeOptions,
       }),
     }
   )

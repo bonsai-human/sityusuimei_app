@@ -1,4 +1,5 @@
 import type { BirthInput } from '../types';
+import { DEFAULT_LUMINARY_BONUS, DEFAULT_ORBS } from './constants';
 import type {
   AngleId,
   AspectKind,
@@ -34,6 +35,23 @@ export interface HoroscopeOptions {
   orbs: Record<AspectKind, number>;
   /** 太陽・月が絡むアスペクトで、オーブをこれだけ広げる */
   luminaryOrbBonus: number;
+}
+
+/**
+ * 設定の既定値。
+ *
+ * 天体暦（astronomy-engine）を引かない場所に置いてある。設定だけを読む側が
+ * 計算層ごと読み込まずに済み、ホロスコープの画面を遅延読み込みできる。
+ */
+export function defaultHoroscopeOptions(): HoroscopeOptions {
+  return {
+    houseSystem: 'placidus',
+    nodeKind: 'mean',
+    minorAspects: false,
+    modernRulers: true,
+    orbs: { ...DEFAULT_ORBS },
+    luminaryOrbBonus: DEFAULT_LUMINARY_BONUS,
+  };
 }
 
 /** 黄経を、サインと度分に割った表示用の形。 */

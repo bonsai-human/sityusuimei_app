@@ -22,8 +22,6 @@ import { findAspects, type AspectPoint } from './aspects';
 import { bodyState, sunAltitude, trueObliquity } from './bodies';
 import {
   BODY_IDS,
-  DEFAULT_LUMINARY_BONUS,
-  DEFAULT_ORBS,
   SIGN_ELEMENT,
   SIGN_QUALITY,
   SIGN_RULER_CLASSIC,
@@ -36,6 +34,7 @@ import {
 import { ascendant, localSiderealDegrees, midheaven, vertex } from './angles';
 import { buildHouses, houseOf } from './houses';
 import { norm360, signPosition } from './math';
+import { defaultHoroscopeOptions } from './types';
 import type {
   AnglePlacement,
   Horoscope,
@@ -52,17 +51,6 @@ export const PLANETS: BodyId[] = BODY_IDS.filter(
 
 /** astronomy-engine が冥王星を出せる範囲。 */
 const PLUTO_YEAR_RANGE = { from: 1700, to: 2200 };
-
-export function defaultHoroscopeOptions(): HoroscopeOptions {
-  return {
-    houseSystem: 'placidus',
-    nodeKind: 'mean',
-    minorAspects: false,
-    modernRulers: true,
-    orbs: { ...DEFAULT_ORBS },
-    luminaryOrbBonus: DEFAULT_LUMINARY_BONUS,
-  };
-}
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');

@@ -6,7 +6,8 @@ import { TOKYO } from '../../../data/cities';
 import { equationOfTime, meridianOf } from '../../solarTime';
 import type { BirthInput, BirthPlace } from '../../types';
 import { localSiderealDegrees } from '../angles';
-import { buildHoroscope, defaultHoroscopeOptions } from '../chart';
+import { buildHoroscope } from '../chart';
+import { defaultHoroscopeOptions } from '../types';
 import { norm180, norm360, separation } from '../math';
 import type { BodyId } from '../constants';
 
