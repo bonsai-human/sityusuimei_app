@@ -12,6 +12,7 @@ import ChartWheel from './ChartWheel';
 import HoroscopeSettings from './HoroscopeSettings';
 import HouseTable from './HouseTable';
 import PlacementTable from './PlacementTable';
+import TransitPanel from './TransitPanel';
 import { signClass } from './style';
 
 /**
@@ -149,6 +150,7 @@ export default function HoroscopeView({
       {horoscope.houses && <HouseTable horoscope={horoscope} />}
       <AspectTable horoscope={horoscope} />
       <BalanceBars horoscope={horoscope} />
+      <TransitPanel natal={horoscope} options={options} />
       <HoroscopeSettings options={options} onChange={onOptionsChange} />
     </div>
   );

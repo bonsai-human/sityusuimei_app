@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 
 import { elementOfGan, elementOfZhi } from '../../core/ganzhi';
 import {
@@ -12,15 +12,19 @@ import {
   type EventCategory,
   type EventContext,
 } from '../../core/lifelog';
+import type { HoroscopeOptions } from '../../core/horoscope/types';
 import { RELATION_TONE, SLOT_LABEL, type CrossRelation } from '../../core/relations';
-import type { Chart, DaYunEntry } from '../../core/types';
+import type { BirthInput, Chart, DaYunEntry } from '../../core/types';
 import {
   addEvent,
   deleteEvent,
   listEvents,
   type LifeEventRow,
 } from '../../db/database';
-import { Button, Field, LabeledGroup, Note, Section, Segmented, elementClass } from '../ui';
+import { Button, Field, LabeledGroup, Note, Section, Segmented, Toggle, elementClass } from '../ui';
+
+/** ホロスコープ側は天体暦を要するので、必要になったときだけ読み込む。 */
+const EventTransits = lazy(() => import('../horoscope/EventTransits'));
 
 function GanZhiChip({ gan, zhi }: { gan: string; zhi: string }) {
   if (!gan || !zhi) return null;
@@ -75,12 +79,15 @@ function EventCard({
   context,
   onDelete,
   showDaYun,
+  transits,
 }: {
   event: LifeEventRow;
   context: EventContext | null;
   onDelete: () => void;
   /** 大運ごとにまとめて見せているときは、大運の行が重複するので出さない */
   showDaYun: boolean;
+  /** ホロスコープのめぐりも並べるとき、その算出に要るもの */
+  transits: { input: BirthInput; options: HoroscopeOptions } | null;
 }) {
   const tone = context ? toneCount(context) : { bond: 0, clash: 0 };
 
@@ -166,6 +173,28 @@ function EventCard({
                 </span>
               </dd>
             </div>
+            {transits && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <dt className="w-10 shrink-0 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+                  めぐり
+                </dt>
+                <dd className="flex flex-wrap items-center gap-2">
+                  <Suspense
+                    fallback={
+                      <span className="text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+                        …
+                      </span>
+                    }
+                  >
+                    <EventTransits
+                      input={transits.input}
+                      options={transits.options}
+                      date={event.date}
+                    />
+                  </Suspense>
+                </dd>
+              </div>
+            )}
           </dl>
 
           {(tone.bond > 0 || tone.clash > 0) && (
@@ -189,16 +218,20 @@ export default function LifeLogView({
   chart,
   chartId,
   onGoToChart,
+  horoscopeOptions,
 }: {
   chart: Chart;
   chartId: number | null;
   onGoToChart: () => void;
+  /** ホロスコープも見ているときだけ渡る。null なら四柱推命だけで並べる */
+  horoscopeOptions: HoroscopeOptions | null;
 }) {
   const [date, setDate] = useState(todayString());
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<EventCategory>('仕事');
   const [note, setNote] = useState('');
   const [groupBy, setGroupBy] = useState<'daYun' | 'flat'>('daYun');
+  const [withTransits, setWithTransits] = useState(true);
   const [copied, setCopied] = useState(false);
 
   const events = useLiveQuery(
@@ -210,6 +243,12 @@ export default function LifeLogView({
     () =>
       (events ?? []).map((e) => ({ event: e, context: eventContext(chart, e.date) })),
     [events, chart]
+  );
+
+  /** ホロスコープも見ていて、めぐりを並べる設定のときだけ渡す */
+  const transitProps = useMemo(
+    () => (horoscopeOptions && withTransits ? { input: chart.input, options: horoscopeOptions } : null),
+    [horoscopeOptions, withTransits, chart.input]
   );
 
   const dateValid = parseDate(date) !== null;
@@ -241,15 +280,28 @@ export default function LifeLogView({
   };
 
   const copySummary = async () => {
-    const text = lifeLogSummary(
-      chart,
-      (events ?? []).map((e) => ({
-        date: e.date,
-        title: e.title,
-        category: e.category,
-        note: e.note,
-      }))
-    );
+    const rows = (events ?? []).map((e) => ({
+      date: e.date,
+      title: e.title,
+      category: e.category,
+      note: e.note,
+    }));
+    let text = lifeLogSummary(chart, rows);
+
+    if (transitProps) {
+      // 天体暦はここでだけ要るので、押されたときに読み込む
+      const [{ buildHoroscope }, { transitLogSummary }] = await Promise.all([
+        import('../../core/horoscope/chart'),
+        import('../../core/horoscope/transit'),
+      ]);
+      try {
+        const natal = buildHoroscope(transitProps.input, transitProps.options);
+        text += `\n\n${transitLogSummary(natal, rows, transitProps.options)}`;
+      } catch {
+        // 出生図を組めない入力（緯度なしなど）では、四柱推命の側だけを渡す
+      }
+    }
+
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -328,7 +380,11 @@ export default function LifeLogView({
 
       <Section
         title={`記録（${withContext.length}件）`}
-        subtitle="それぞれの出来事に、その時期に巡っていた大運・流年と、命式のどこに掛かっていたかを添えます"
+        subtitle={
+          horoscopeOptions
+            ? 'それぞれの出来事に、その時期に巡っていた大運・流年と、天体のめぐりを添えます'
+            : 'それぞれの出来事に、その時期に巡っていた大運・流年と、命式のどこに掛かっていたかを添えます'
+        }
         actions={
           <div className="flex items-center gap-2">
             <Segmented
@@ -347,6 +403,16 @@ export default function LifeLogView({
           </div>
         }
       >
+        {horoscopeOptions && (
+          <div className="mb-3">
+            <Toggle
+              checked={withTransits}
+              onChange={setWithTransits}
+              label="天体のめぐりも並べる"
+              hint="木星から先の天体が、その日に出生図のどこへ掛かっていたか。数日で通り過ぎる天体は外しています"
+            />
+          </div>
+        )}
         {events === undefined ? (
           <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
             読み込んでいます…
@@ -359,6 +425,7 @@ export default function LifeLogView({
           <ul className="flex flex-col gap-2">
             {withContext.map(({ event, context }) => (
               <EventCard
+                transits={transitProps}
                 key={event.id}
                 event={event}
                 context={context}
@@ -401,6 +468,7 @@ export default function LifeLogView({
                 <ul className="flex flex-col gap-2">
                   {g.items.map(({ event, context }) => (
                     <EventCard
+                      transits={transitProps}
                       key={event.id}
                       event={event}
                       context={context}

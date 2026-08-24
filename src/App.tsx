@@ -239,11 +239,11 @@ export default function App() {
             </p>
           ))}
 
-        {/* 比較・人生ログは、いまのところ四柱推命だけを扱う */}
-        {showHoroscope && (tab === 'compare' || tab === 'lifelog') && (
+        {/* 比較は、いまのところ四柱推命だけを扱う */}
+        {showHoroscope && tab === 'compare' && (
           <Note>
             この画面はいまのところ四柱推命だけに対応しています。
-            シナストリー（相性）とトランジットは、これから足していきます。
+            シナストリー（二人の天体どうしの角度）は、これから足します。
           </Note>
         )}
 
@@ -312,6 +312,7 @@ export default function App() {
               chart={chart}
               chartId={savedId}
               onGoToChart={() => setTab('chart')}
+              horoscopeOptions={showHoroscope ? horoscopeOptions : null}
             />
           ) : (
             <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
