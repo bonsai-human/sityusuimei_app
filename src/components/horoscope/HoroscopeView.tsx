@@ -91,6 +91,15 @@ export default function HoroscopeView({
             </dt>
             <dd style={{ color: 'var(--ink-muted)' }}>{horoscope.meta.utc}</dd>
           </div>
+          <div className="flex gap-2 py-0.5">
+            <dt className="w-24 shrink-0" style={{ color: 'var(--ink-faint)' }}>
+              座標
+            </dt>
+            <dd style={{ color: 'var(--ink-muted)' }}>
+              東経 {input.place.longitude.toFixed(4)}°
+              {input.place.latitude != null && ` / 北緯 ${input.place.latitude.toFixed(4)}°`}
+            </dd>
+          </div>
           {horoscope.meta.localSiderealTime != null && (
             <div className="flex gap-2 py-0.5">
               <dt className="w-24 shrink-0" style={{ color: 'var(--ink-faint)' }}>
@@ -108,6 +117,20 @@ export default function HoroscopeView({
               </dt>
               <dd style={{ color: 'var(--ink-muted)' }}>
                 {formatSignPosition(horoscope.angles!.mc.position, SIGN_LABEL)}
+              </dd>
+            </div>
+          )}
+          {horoscope.meta.anglesPerMinute && (
+            <div className="flex gap-2 py-0.5">
+              <dt className="w-24 shrink-0" style={{ color: 'var(--ink-faint)' }}>
+                時刻 1 分で
+              </dt>
+              <dd style={{ color: 'var(--ink-muted)' }}>
+                ASC が {horoscope.meta.anglesPerMinute.asc.toFixed(2)}° / MC が{' '}
+                {horoscope.meta.anglesPerMinute.mc.toFixed(2)}° 動く
+                <span className="ml-1" style={{ color: 'var(--ink-faint)' }}>
+                  （出生地の経度が 0.25° 違うのも、時刻が 1 分違うのと同じだけ効きます）
+                </span>
               </dd>
             </div>
           )}

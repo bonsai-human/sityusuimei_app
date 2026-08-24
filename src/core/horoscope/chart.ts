@@ -33,7 +33,7 @@ import {
 } from './constants';
 import { ascendant, localSiderealDegrees, midheaven, vertex } from './angles';
 import { buildHouses, houseOf } from './houses';
-import { norm360, signPosition } from './math';
+import { norm180, norm360, signPosition } from './math';
 import { defaultHoroscopeOptions } from './types';
 import type {
   AnglePlacement,
@@ -210,12 +210,22 @@ export function buildHoroscope(
   let angles: Record<AngleId, AnglePlacement> | null = null;
   let houses: Horoscope['houses'] = null;
   let lst: number | null = null;
+  let anglesPerMinute: { asc: number; mc: number } | null = null;
 
   if (timeKnown && latitude != null) {
     lst = localSiderealDegrees(time, input.place.longitude);
     const asc = ascendant(lst, latitude, obliquity);
     const mc = midheaven(lst, obliquity);
     const vx = vertex(lst, latitude, obliquity);
+
+    // 1 分先の感受点との差を取り、この図での「時刻 1 分あたりの動き」を出す
+    const laterTime = Astronomy.MakeTime(new Date(utcMs + 60_000));
+    const laterLst = localSiderealDegrees(laterTime, input.place.longitude);
+    const laterObliquity = trueObliquity(laterTime);
+    anglesPerMinute = {
+      asc: norm180(ascendant(laterLst, latitude, laterObliquity) - asc),
+      mc: norm180(midheaven(laterLst, laterObliquity) - mc),
+    };
 
     const make = (id: AngleId, lon: number): AnglePlacement => ({
       id,
@@ -324,6 +334,7 @@ export function buildHoroscope(
       timePrecision: precision,
       obliquity,
       localSiderealTime: lst,
+      anglesPerMinute,
       notes,
     },
   };

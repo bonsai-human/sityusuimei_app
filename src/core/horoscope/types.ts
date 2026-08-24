@@ -145,6 +145,14 @@ export interface HoroscopeMeta {
   obliquity: number;
   /** 地方恒星時（度）。時刻不明なら null */
   localSiderealTime: number | null;
+  /**
+   * 出生時刻が 1 分ずれたときに、アセンダントと MC が動く度数。
+   *
+   * サインと緯度によって変わる（この図ではいくら動くのか）ので、実際に 1 分先の値との
+   * 差から出している。他の資料と数値が合わないときに、時刻・経度どちらの差なのかを
+   * 見積もる手がかりになる。
+   */
+  anglesPerMinute: { asc: number; mc: number } | null;
   /** 読むときに断っておくこと */
   notes: string[];
 }

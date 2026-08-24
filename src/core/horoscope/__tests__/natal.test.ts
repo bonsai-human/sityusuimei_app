@@ -94,6 +94,33 @@ describe('1990年1月1日 12:00 東京', () => {
     ]);
   });
 
+  /**
+   * 感受点は時刻と経度に敏感で、他の資料と数値が合わないときの原因はたいていここにある。
+   * どちらも地方恒星時を通して効くので、動く量の比は必ず一定になる。
+   * その比を固定しておくと、ずれの出どころが時刻・経度なのか、それ以外なのかを切り分けられる。
+   */
+  it('感受点は時刻と経度に敏感で、どちらも同じ比で効く', () => {
+    const perMinute = h.meta.anglesPerMinute!;
+    expect(perMinute.asc).toBeCloseTo(0.375, 2);
+    expect(perMinute.mc).toBeCloseTo(0.233, 2);
+
+    // 経度を 0.25 度ずらすのは、時刻を 1 分ずらすのとほぼ同じ（地球は 1 分で 0.2507 度回る）
+    const east = buildHoroscope({
+      ...BASE,
+      place: { ...TOKYO, longitude: TOKYO.longitude + 0.25 },
+    });
+    expect(east.angles!.asc.lon - h.angles!.asc.lon).toBeCloseTo(perMinute.asc, 2);
+    expect(east.angles!.mc.lon - h.angles!.mc.lon).toBeCloseTo(perMinute.mc, 2);
+
+    // 緯度はアセンダントにだけ効き、MC には効かない
+    const north = buildHoroscope({
+      ...BASE,
+      place: { ...TOKYO, latitude: TOKYO.latitude! + 0.25 },
+    });
+    expect(north.angles!.mc.lon).toBeCloseTo(h.angles!.mc.lon, 9);
+    expect(north.angles!.asc.lon).not.toBeCloseTo(h.angles!.asc.lon, 3);
+  });
+
   it('全体の傾き', () => {
     expect(h.dayChart).toBe(true);
     // アセンダントが牡羊座なので、その支配星は火星
