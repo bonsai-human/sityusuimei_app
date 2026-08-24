@@ -194,6 +194,13 @@ export default function App() {
               setInput(patch);
             }}
             onSubmit={() => setTab(chart ? 'chart' : 'input')}
+            submitLabel={
+              system === 'horoscope'
+                ? 'ホロスコープを組む'
+                : system === 'both'
+                  ? '命式とホロスコープを組む'
+                  : '命式を組む'
+            }
           />
         )}
 

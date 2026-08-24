@@ -21,10 +21,13 @@ export default function BirthForm({
   input,
   onChange,
   onSubmit,
+  submitLabel = '命式を組む',
 }: {
   input: BirthInput;
   onChange: (patch: Partial<BirthInput>) => void;
   onSubmit: () => void;
+  /** 選んでいる占術によって「命式を組む」「ホロスコープを組む」が変わる */
+  submitLabel?: string;
 }) {
   // ローカルに取り出しておくと、コールバックの中でも kind による絞り込みが効く
   const time = input.time;
@@ -334,7 +337,7 @@ export default function BirthForm({
 
       <div className="sticky bottom-3 z-10">
         <Button type="submit" variant="primary" full>
-          命式を組む
+          {submitLabel}
         </Button>
       </div>
     </form>
